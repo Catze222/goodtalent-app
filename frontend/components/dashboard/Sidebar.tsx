@@ -133,13 +133,7 @@ export default function Sidebar() {
                   />
                   
                   {!isCollapsed && (
-                    <>
-                      <span className="font-semibold">{item.name}</span>
-                      {/* Active indicator */}
-                      {active && (
-                        <div className="ml-auto w-2 h-2 bg-[#004C4C] rounded-full animate-pulse"></div>
-                      )}
-                    </>
+                    <span className="font-semibold">{item.name}</span>
                   )}
                 </Link>
                 

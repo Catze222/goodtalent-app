@@ -82,13 +82,13 @@ export default function HomePage() {
         </div>
         
         {/* Mobile Optimized Layout */}
-        <div className="w-full lg:hidden flex flex-col justify-center min-h-screen py-8">
+        <div className="w-full lg:hidden flex flex-col justify-center min-h-screen py-4">
           {/* Mobile Logo */}
-          <div className="flex justify-center mb-12">
+          <div className="flex justify-center mb-6">
             <img 
               src="https://ttwzkomzsqrulwwqrlyo.supabase.co/storage/v1/object/public/generales/Logo.png"
               alt="GOOD Talent Logo"
-              className="h-16 w-auto object-contain"
+              className="h-24 w-auto object-contain"
             />
           </div>
           

@@ -87,11 +87,6 @@ export default function BottomNavigation() {
               `}>
                 {item.name}
               </span>
-              
-              {/* Active indicator dot */}
-              {active && (
-                <div className="absolute -top-0.5 w-1 h-1 bg-[#004C4C] rounded-full animate-pulse"></div>
-              )}
             </Link>
           )
         })}
