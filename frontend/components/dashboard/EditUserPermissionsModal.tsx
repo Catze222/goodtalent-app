@@ -205,9 +205,10 @@ export default function EditUserPermissionsModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-lg sm:rounded-xl shadow-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg sm:rounded-xl shadow-xl w-full max-w-4xl h-[95vh] sm:h-[90vh] flex flex-col">
+        
+        {/* Header - Fixed */}
         <div className="flex-shrink-0 p-4 sm:p-6 border-b border-gray-200">
-          {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3 min-w-0 flex-1">
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#87E0E0] bg-opacity-20 rounded-full flex items-center justify-center flex-shrink-0">
@@ -228,11 +229,12 @@ export default function EditUserPermissionsModal({
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden p-4 sm:p-6">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
 
           {/* Changes Summary */}
           {changes.length > 0 && (
-            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg flex-shrink-0">
               <div className="flex items-center space-x-2 mb-2">
                 <History className="w-4 h-4 text-blue-600" />
                 <span className="text-xs sm:text-sm font-medium text-blue-800">
@@ -251,14 +253,14 @@ export default function EditUserPermissionsModal({
 
           {/* Error Message */}
           {error && (
-            <div className="mb-6 flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
+            <div className="mb-4 sm:mb-6 flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg flex-shrink-0">
               <AlertCircle className="w-4 h-4" />
               <span className="text-sm">{error}</span>
             </div>
           )}
 
           {/* Permissions List */}
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 sm:space-y-4 mb-4 sm:mb-6">
+          <div className="space-y-3 sm:space-y-4">
             {loading || permissionsLoading ? (
               <div className="text-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#5FD3D2]" />
@@ -269,7 +271,7 @@ export default function EditUserPermissionsModal({
                 const activeCount = permissions.filter(p => isPermissionActive(tableName, p.action)).length
                 
                 return (
-                  <div key={tableName} className="border border-gray-200 rounded-lg p-3 sm:p-4">
+                  <div key={tableName} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-medium text-sm sm:text-base text-[#004C4C] capitalize">
                         {tableName.replace('_', ' ')}
@@ -279,7 +281,7 @@ export default function EditUserPermissionsModal({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                       {permissions.map((permission) => {
                         const isActive = isPermissionActive(tableName, permission.action)
                         const hasChange = changes.some(c => c.table_name === tableName && c.action === permission.action)
@@ -319,6 +321,9 @@ export default function EditUserPermissionsModal({
               })
             )}
           </div>
+
+          {/* Spacer to ensure footer doesn't overlap content */}
+          <div className="h-4 sm:h-6 flex-shrink-0"></div>
         </div>
 
         {/* Footer - Fixed at bottom */}
@@ -330,7 +335,7 @@ export default function EditUserPermissionsModal({
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
               <button
                 onClick={handleClose}
-                className="w-full sm:w-auto px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors text-center"
+                className="w-full sm:w-auto px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors text-center rounded-lg"
                 disabled={saving}
               >
                 Cancelar

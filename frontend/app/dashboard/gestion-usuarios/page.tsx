@@ -281,8 +281,16 @@ export default function UserManagementPage() {
       <InviteUserModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
-        onSuccess={() => {
-          fetchUsers() // Refresh users list
+        onSuccess={async () => {
+          try {
+            // Refrescar la lista de usuarios después de una invitación exitosa
+            await fetchUsers()
+            setShowInviteModal(false) // Asegurar que el modal se cierre
+          } catch (error) {
+            console.error('Error refreshing users after invite:', error)
+            // Forzar refresh de la página si falla el refresh
+            window.location.reload()
+          }
         }}
       />
 
@@ -292,8 +300,17 @@ export default function UserManagementPage() {
           setShowEditModal(false)
           setSelectedUser(null)
         }}
-        onSuccess={() => {
-          fetchUsers() // Refresh users list
+        onSuccess={async () => {
+          try {
+            // Refrescar la lista de usuarios después de editar permisos
+            await fetchUsers()
+            setShowEditModal(false) // Asegurar que el modal se cierre
+            setSelectedUser(null)   // Limpiar usuario seleccionado
+          } catch (error) {
+            console.error('Error refreshing users after edit:', error)
+            // Forzar refresh de la página si falla el refresh
+            window.location.reload()
+          }
         }}
         user={selectedUser ? { id: selectedUser.id, email: selectedUser.email } : null}
       />

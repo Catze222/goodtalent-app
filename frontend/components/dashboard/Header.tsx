@@ -49,9 +49,9 @@ export default function Header({ user }: HeaderProps) {
       setShowUserMenu(false) // Cerrar menú inmediatamente
       
       // Limpiar estado local de permisos
-      const { refreshPermissions } = usePermissions()
-      if (refreshPermissions) {
-        refreshPermissions()
+      const { forceRefresh } = usePermissions()
+      if (forceRefresh) {
+        forceRefresh()
       }
       
       // Cerrar sesión en Supabase

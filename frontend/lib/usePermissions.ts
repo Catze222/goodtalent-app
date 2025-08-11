@@ -28,17 +28,25 @@ export function usePermissions() {
   const [user, setUser] = useState<User | null>(null)
   const [userPermissions, setUserPermissions] = useState<UserPermission[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     // Obtener usuario actual
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      
-      if (user) {
-        await fetchUserPermissions()
+      try {
+        setLoading(true)
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+        
+        if (user) {
+          await fetchUserPermissions()
+        }
+      } catch (error) {
+        console.error('Error getting user:', error)
+        setUserPermissions([])
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     // Obtener permisos del usuario actual
@@ -80,7 +88,7 @@ export function usePermissions() {
     )
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [refreshKey]) // Agregar refreshKey como dependencia
 
   // Verificar si el usuario tiene un permiso específico
   const hasPermission = (tableName: string, action: string): boolean => {
@@ -105,8 +113,14 @@ export function usePermissions() {
 
   // Refrescar permisos
   const refreshPermissions = async () => {
-    if (user) {
-      try {
+    try {
+      setLoading(true)
+      
+      // Obtener usuario actualizado
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      setUser(currentUser)
+      
+      if (currentUser) {
         const { data, error } = await supabase.rpc('my_permissions')
         
         if (error) {
@@ -123,11 +137,20 @@ export function usePermissions() {
         }
         
         setUserPermissions(data || [])
-      } catch (error) {
-        console.error('Error refreshing permissions:', error)
+      } else {
         setUserPermissions([])
       }
+    } catch (error) {
+      console.error('Error refreshing permissions:', error)
+      setUserPermissions([])
+    } finally {
+      setLoading(false)
     }
+  }
+
+  // Función para forzar re-evaluación completa
+  const forceRefresh = () => {
+    setRefreshKey(prev => prev + 1)
   }
 
   return {
@@ -137,7 +160,8 @@ export function usePermissions() {
     hasPermission,
     canManageUsers,
     isSuperAdmin,
-    refreshPermissions
+    refreshPermissions,
+    forceRefresh
   }
 }
 

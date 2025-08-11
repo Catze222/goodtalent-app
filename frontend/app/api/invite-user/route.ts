@@ -72,6 +72,9 @@ export async function POST(request: NextRequest) {
     // Usar el redirectTo del frontend o construir con el origin del request
     const finalRedirectTo = redirectTo || `${origin}/auth/callback`
     
+    console.log('🔍 Sending invite with redirectTo:', finalRedirectTo)
+    console.log('🔍 Origin detected:', origin)
+    
     // Invitar usuario usando Service Role Key
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo: finalRedirectTo

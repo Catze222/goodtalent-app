@@ -135,44 +135,60 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
         throw new Error('Usuario no autenticado')
       }
 
+      // Procesar permisos de manera más robusta
+      const permissionErrors: string[] = []
+      
       for (const [tableName, actions] of Object.entries(selectedPermissions)) {
         for (const action of actions) {
-          // Obtener el ID del permiso
-          const { data: permissionData, error: permissionError } = await supabase
-            .from('permissions')
-            .select('id')
-            .eq('table_name', tableName)
-            .eq('action', action)
-            .single()
+          try {
+            // Obtener el ID del permiso
+            const { data: permissionData, error: permissionError } = await supabase
+              .from('permissions')
+              .select('id')
+              .eq('table_name', tableName)
+              .eq('action', action)
+              .single()
 
-          if (permissionError || !permissionData) {
-            console.error(`Error finding permission for ${tableName}.${action}:`, permissionError)
-            continue
-          }
+            if (permissionError || !permissionData) {
+              console.error(`Error finding permission for ${tableName}.${action}:`, permissionError)
+              permissionErrors.push(`${tableName}.${action}`)
+              continue
+            }
 
-          // Asignar permiso
-          const { error: assignError } = await supabase.rpc('assign_permission_to_user', {
-            target_user_id: data.user.id,
-            target_permission_id: permissionData.id,
-            assigned_by: assignedBy
-          })
+            // Asignar permiso
+            const { error: assignError } = await supabase.rpc('assign_permission_to_user', {
+              target_user_id: data.user.id,
+              target_permission_id: permissionData.id,
+              assigned_by: assignedBy
+            })
 
-          if (assignError) {
-            console.error(`Error assigning permission ${tableName}.${action}:`, assignError)
+            if (assignError) {
+              console.error(`Error assigning permission ${tableName}.${action}:`, assignError)
+              permissionErrors.push(`${tableName}.${action}`)
+            }
+          } catch (permError) {
+            console.error(`Error processing permission ${tableName}.${action}:`, permError)
+            permissionErrors.push(`${tableName}.${action}`)
           }
         }
       }
 
-      // Éxito
-      resetForm()
-      onSuccess()
-      onClose()
+      // Mostrar advertencia si hubo errores en permisos, pero continuar
+      if (permissionErrors.length > 0) {
+        console.warn('Some permissions could not be assigned:', permissionErrors)
+      }
+
+      // Éxito - resetear estado ANTES de llamar callbacks
+      resetForm() // Limpiar estado inmediatamente
+      
+      // Llamar callbacks después del reset
+      onSuccess() // Esto debe refrescar la lista de usuarios
+      onClose()   // Esto cierra el modal con estado limpio
 
     } catch (error: any) {
       console.error('Error inviting user:', error)
       setError(error.message || 'Error al invitar usuario')
-    } finally {
-      setLoading(false)
+      setLoading(false) // Solo resetear loading en caso de error
     }
   }
 
@@ -182,6 +198,9 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
     setStep('email')
     setError('')
     setLoading(false)
+    
+    // Limpiar cualquier timeout o promise pendiente
+    // Esto es importante para evitar estados inconsistentes
   }
 
   const handleClose = () => {
@@ -458,8 +477,8 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-lg sm:rounded-xl shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+      <div className="bg-white rounded-lg sm:rounded-xl shadow-xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
+        <div className="max-h-[95vh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           {step === 'email' && renderEmailStep()}
           {step === 'permissions' && renderPermissionsStep()}
           {step === 'confirm' && renderConfirmStep()}
@@ -468,3 +487,4 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
     </div>
   )
 }
+
