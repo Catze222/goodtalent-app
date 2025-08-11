@@ -10,10 +10,12 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import ForgotPasswordForm from './ForgotPasswordForm'
 import { translateError } from '../lib/errorMessages'
+import { Eye, EyeOff } from 'lucide-react'
 
 export default function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showForgotPassword, setShowForgotPassword] = useState(false)
@@ -129,13 +131,28 @@ export default function LoginForm() {
           <div className="relative">
             <input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 lg:px-5 py-3 lg:py-4 bg-white bg-opacity-60 backdrop-blur-sm border-2 border-[#87E0E0] border-opacity-30 rounded-xl lg:rounded-2xl focus:outline-none focus:border-[#5FD3D2] focus:border-opacity-60 focus:bg-opacity-80 transition-all duration-300 text-[#004C4C] font-medium text-sm lg:text-base"
+              className="w-full px-4 lg:px-5 pr-12 py-3 lg:py-4 bg-white bg-opacity-60 backdrop-blur-sm border-2 border-[#87E0E0] border-opacity-30 rounded-xl lg:rounded-2xl focus:outline-none focus:border-[#5FD3D2] focus:border-opacity-60 focus:bg-opacity-80 transition-all duration-300 text-[#004C4C] font-medium text-sm lg:text-base"
               placeholder="••••••••••••••••"
             />
+            
+            {/* Password Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 text-[#065C5C] hover:text-[#004C4C] hover:bg-[#87E0E0] hover:bg-opacity-20 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#5FD3D2] focus:ring-opacity-50"
+              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {showPassword ? (
+                <EyeOff className="h-5 w-5" />
+              ) : (
+                <Eye className="h-5 w-5" />
+              )}
+            </button>
+            
             {/* Field accent */}
             <div className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#87E0E0] to-[#5FD3D2] rounded-full transform scale-x-0 transition-transform duration-300 focus-within:scale-x-100"></div>
           </div>

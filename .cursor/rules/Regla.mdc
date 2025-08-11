@@ -105,9 +105,9 @@ Code should mostly be self-explanatory.
 
 ---
 
-✅ 7. Database Schema (/schema/db.schema.md)
+✅ 7. Database Schema (supabase/migrations/db.schema.md)
 
-Only update this file when:
+**ALWAYS UPDATE** this file when:
 
 Tables are created or deleted
 
@@ -115,10 +115,15 @@ Columns are added/removed
 
 Relationships are changed
 
+Migrations are created
+
+Indexes or constraints are modified
+
 
 📝 Always edit the existing table in place.
 🚫 Never duplicate or add a table at the bottom that already exists.
-👀 Only consult this file when the developer says to do so.
+📋 **MANDATORY:** Update db.schema.md immediately after any database changes to maintain accurate documentation.
+🎯 This file serves as the single source of truth for the database structure.
 
 
 ---

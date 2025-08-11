@@ -4,11 +4,14 @@ import { useState, useEffect, useRef } from 'react'
 import { User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import { usePermissions } from '../../lib/usePermissions'
 import { 
   Bell, 
   LogOut, 
   User as UserIcon,
-  ChevronDown
+  ChevronDown,
+  Users,
+  Settings
 } from 'lucide-react'
 
 interface HeaderProps {
@@ -22,6 +25,7 @@ export default function Header({ user }: HeaderProps) {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const { canManageUsers } = usePermissions()
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
@@ -42,11 +46,40 @@ export default function Header({ user }: HeaderProps) {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut()
+      setShowUserMenu(false) // Cerrar menú inmediatamente
+      
+      // Limpiar estado local de permisos
+      const { refreshPermissions } = usePermissions()
+      if (refreshPermissions) {
+        refreshPermissions()
+      }
+      
+      // Cerrar sesión en Supabase
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('Error signing out:', error)
+        return
+      }
+      
+      // Limpiar localStorage/sessionStorage si es necesario
+      localStorage.clear()
+      sessionStorage.clear()
+      
+      // Redirigir
       router.push('/')
+      router.refresh() // Forzar refresh de la página
+      
     } catch (error) {
-      console.error('Error signing out:', error)
+      console.error('Error during logout:', error)
+      // Fallback: forzar redirect incluso si hay error
+      window.location.href = '/'
     }
+  }
+
+  const handleUserManagement = () => {
+    setShowUserMenu(false)
+    router.push('/dashboard/gestion-usuarios')
   }
 
   return (
@@ -114,6 +147,19 @@ export default function Header({ user }: HeaderProps) {
                 </div>
                 
                 <div className="py-2">
+                  {canManageUsers() && (
+                    <>
+                      <button
+                        onClick={handleUserManagement}
+                        className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
+                      >
+                        <Users className="h-4 w-4 mr-3" />
+                        Gestión de usuarios
+                      </button>
+                      <div className="border-t border-gray-100 my-2"></div>
+                    </>
+                  )}
+                  
                   <button
                     onClick={handleLogout}
                     className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200"
