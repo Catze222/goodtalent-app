@@ -33,7 +33,7 @@ export default function HomePage() {
             {/* Logo Clean */}
             <div className="mb-10 flex justify-center">
               <img 
-                src="https://ttwzkomzsqrulwwqrlyo.supabase.co/storage/v1/object/public/generales/Logo.png"
+                src="https://irvgruylufihzoveycph.supabase.co/storage/v1/object/public/generales/Logo.png"
                 alt="GOOD Talent Logo"
                 className="h-36 w-auto object-contain transform hover:scale-105 transition-transform duration-300"
               />
@@ -86,7 +86,7 @@ export default function HomePage() {
           {/* Mobile Logo */}
           <div className="flex justify-center mb-6">
             <img 
-              src="https://ttwzkomzsqrulwwqrlyo.supabase.co/storage/v1/object/public/generales/Logo.png"
+              src="https://irvgruylufihzoveycph.supabase.co/storage/v1/object/public/generales/Logo.png"
               alt="GOOD Talent Logo"
               className="h-24 w-auto object-contain"
             />

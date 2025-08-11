@@ -56,7 +56,7 @@ export default function Header({ user }: HeaderProps) {
         {/* Mobile Logo */}
         <div className="lg:hidden flex items-center justify-center">
           <img 
-            src="https://ttwzkomzsqrulwwqrlyo.supabase.co/storage/v1/object/public/generales/Logo.png"
+                          src="https://irvgruylufihzoveycph.supabase.co/storage/v1/object/public/generales/Logo.png"
             alt="GOOD Talent Logo"
             className="h-8 w-auto object-contain"
           />

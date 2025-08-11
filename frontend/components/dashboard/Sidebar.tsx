@@ -96,7 +96,7 @@ export default function Sidebar() {
             // Logo grande cuando está expandido
             <div className="flex items-center justify-center w-full px-4">
               <img 
-                src="https://ttwzkomzsqrulwwqrlyo.supabase.co/storage/v1/object/public/generales/Logo.png"
+                src="https://irvgruylufihzoveycph.supabase.co/storage/v1/object/public/generales/Logo.png"
                 alt="GOOD Talent Logo"
                 className="w-auto object-contain h-12 max-w-full transition-all duration-300"
                 style={{ filter: 'brightness(0) invert(1)' }}
