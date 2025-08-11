@@ -9,6 +9,10 @@ import { NextRequest, NextResponse } from 'next/server'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error('Missing required environment variables: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
+}
+
 // Cliente admin para operaciones administrativas
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
@@ -27,6 +31,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // Obtener el origin del request para determinar la URL base
+    const origin = request.headers.get('origin') || 
+                  request.headers.get('referer')?.split('/').slice(0, 3).join('/') ||
+                  `https://${request.headers.get('host')}`
 
     // Verificar que el usuario tiene permisos de admin
     // Crear cliente con el token del usuario para verificar permisos
@@ -60,9 +69,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Usar el redirectTo del frontend o construir con el origin del request
+    const finalRedirectTo = redirectTo || `${origin}/auth/callback`
+    
     // Invitar usuario usando Service Role Key
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: redirectTo || `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`
+      redirectTo: finalRedirectTo
     })
 
     if (error) {

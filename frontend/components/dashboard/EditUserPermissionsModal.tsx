@@ -258,7 +258,7 @@ export default function EditUserPermissionsModal({
           )}
 
           {/* Permissions List */}
-          <div className="flex-1 overflow-y-auto space-y-3 sm:space-y-4 mb-4 sm:mb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-3 sm:space-y-4 mb-4 sm:mb-6">
             {loading || permissionsLoading ? (
               <div className="text-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#5FD3D2]" />
