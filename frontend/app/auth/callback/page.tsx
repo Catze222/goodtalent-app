@@ -27,58 +27,94 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        console.log('🔍 Processing auth callback...')
+        
         // Verificar si hay hash fragments (Supabase usa #)
         const hash = window.location.hash
+        const search = window.location.search
         
-        if (hash) {
-          // Parsear parámetros del hash
-          const hashParams = new URLSearchParams(hash.substring(1))
-          const type = hashParams.get('type')
-          const accessToken = hashParams.get('access_token')
-          
-          if (type === 'invite' && accessToken) {
-            // Es una invitación, procesar manualmente
-            const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-            
-            if (sessionData.session?.user) {
-              // Verificar si el usuario necesita establecer contraseña
-              // Los usuarios invitados tienen email_confirmed_at pero no han establecido contraseña
-              const user = sessionData.session.user
-              
-              if (user.email_confirmed_at && user.created_at) {
-                const createdAt = new Date(user.created_at)
-                const confirmedAt = new Date(user.email_confirmed_at)
-                const timeDiff = Math.abs(confirmedAt.getTime() - createdAt.getTime())
-                
-                // Si se confirmó muy rápido (menos de 1 minuto), es invitación
-                if (timeDiff < 60000) {
-                  setUserEmail(user.email || '')
-                  setIsValidToken(true)
-                  setLoading(false)
-                  return
-                }
-              }
-            }
-          }
-        }
+        console.log('🔍 Hash:', hash)
+        console.log('🔍 Search:', search)
         
-        // Método alternativo: verificar sesión actual
-        const { data, error } = await supabase.auth.getSession()
+        // Primero intentar obtener la sesión actual
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
         
-        if (error) {
-          console.error('Error getting session:', error)
-          setError('Link de invitación inválido o expirado')
+        if (sessionError) {
+          console.error('Error getting session:', sessionError)
+          setError('Error procesando la invitación')
           setLoading(false)
           return
         }
 
-        if (data.session?.user) {
-          // Si ya hay sesión, ir al dashboard
+        // Si hay hash con type=invite, es definitivamente una invitación
+        if (hash) {
+          const hashParams = new URLSearchParams(hash.substring(1))
+          const type = hashParams.get('type')
+          const accessToken = hashParams.get('access_token')
+          
+          console.log('🔍 Hash type:', type)
+          console.log('🔍 Has access token:', !!accessToken)
+          
+          if (type === 'invite' && accessToken) {
+            console.log('🎯 Detected invite type from hash')
+            
+            if (sessionData.session?.user) {
+              const user = sessionData.session.user
+              console.log('🔍 User from session:', user.email)
+              
+              setUserEmail(user.email || '')
+              setIsValidToken(true)
+              setLoading(false)
+              return
+            }
+          }
+        }
+
+        // Método alternativo más robusto: verificar query parameters
+        const urlParams = new URLSearchParams(search)
+        const type = urlParams.get('type')
+        
+        if (type === 'invite') {
+          console.log('🎯 Detected invite type from query params')
+          
+          if (sessionData.session?.user) {
+            const user = sessionData.session.user
+            console.log('🔍 User from session:', user.email)
+            
+            setUserEmail(user.email || '')
+            setIsValidToken(true)
+            setLoading(false)
+            return
+          }
+        }
+
+        // Método de respaldo: verificar por características del usuario
+        if (sessionData.session?.user) {
+          const user = sessionData.session.user
+          console.log('🔍 Checking user characteristics:', {
+            email: user.email,
+            email_confirmed_at: user.email_confirmed_at,
+            created_at: user.created_at,
+            last_sign_in_at: user.last_sign_in_at
+          })
+          
+          // Si el usuario nunca ha hecho login pero está confirmado = invitación
+          if (user.email_confirmed_at && !user.last_sign_in_at) {
+            console.log('🎯 Detected invite by login pattern')
+            setUserEmail(user.email || '')
+            setIsValidToken(true)
+            setLoading(false)
+            return
+          }
+          
+          // Si ya hay sesión establecida y ha hecho login antes, ir al dashboard
+          console.log('🔄 Existing user, redirecting to dashboard')
           router.push('/dashboard')
           return
         }
 
         // Si llegamos aquí, no hay sesión válida
+        console.log('❌ No valid session found')
         setError('Link de invitación inválido o expirado')
         
       } catch (err) {

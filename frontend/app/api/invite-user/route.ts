@@ -37,6 +37,16 @@ export async function POST(request: NextRequest) {
                   request.headers.get('referer')?.split('/').slice(0, 3).join('/') ||
                   `https://${request.headers.get('host')}`
 
+    // Debug logging para troubleshooting
+    console.log('🔍 API Route - Request Headers:', {
+      origin: request.headers.get('origin'),
+      referer: request.headers.get('referer'),
+      host: request.headers.get('host'),
+      'user-agent': request.headers.get('user-agent')
+    })
+    console.log('🔍 API Route - Determined origin:', origin)
+    console.log('🔍 API Route - Request body:', { email, redirectTo })
+
     // Verificar que el usuario tiene permisos de admin
     // Crear cliente con el token del usuario para verificar permisos
     const userSupabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
@@ -72,12 +82,24 @@ export async function POST(request: NextRequest) {
     // Usar el redirectTo del frontend o construir con el origin del request
     const finalRedirectTo = redirectTo || `${origin}/auth/callback`
     
-    console.log('🔍 Sending invite with redirectTo:', finalRedirectTo)
-    console.log('🔍 Origin detected:', origin)
+    console.log('🔍 API Route - Final invite config:', {
+      email,
+      finalRedirectTo,
+      originalRedirectTo: redirectTo,
+      origin,
+      timestamp: new Date().toISOString()
+    })
     
     // Invitar usuario usando Service Role Key
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo: finalRedirectTo
+    })
+
+    console.log('🔍 API Route - Supabase invite response:', {
+      success: !error,
+      userId: data?.user?.id,
+      error: error?.message,
+      timestamp: new Date().toISOString()
     })
 
     if (error) {

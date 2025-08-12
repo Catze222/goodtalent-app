@@ -141,6 +141,23 @@ export default function EditUserPermissionsModal({
     return permission?.id || ''
   }
 
+  const toggleAllModulePermissions = (tableName: string, permissions: any[]) => {
+    const activeCount = permissions.filter(p => isPermissionActive(tableName, p.action)).length
+    const shouldActivateAll = activeCount < permissions.length
+
+    permissions.forEach(permission => {
+      const currentlyActive = isPermissionActive(tableName, permission.action)
+      const originalPermission = userPermissions.find(p => p.table_name === tableName && p.action === permission.action)
+      const wasOriginallyActive = originalPermission?.is_active || false
+
+      // Si shouldActivateAll es true, activar todos
+      // Si shouldActivateAll es false, desactivar todos
+      if (currentlyActive !== shouldActivateAll) {
+        togglePermission(tableName, permission.action, permission.id)
+      }
+    })
+  }
+
   const handleSave = async () => {
     if (changes.length === 0) {
       onClose()
@@ -204,7 +221,7 @@ export default function EditUserPermissionsModal({
   const getChangesCount = () => changes.length
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-2 sm:p-4">
       <div className="bg-white rounded-lg sm:rounded-xl shadow-xl w-full max-w-4xl h-[95vh] sm:h-[90vh] flex flex-col">
         
         {/* Header - Fixed */}
@@ -273,9 +290,27 @@ export default function EditUserPermissionsModal({
                 return (
                   <div key={tableName} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white">
                     <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-sm sm:text-base text-[#004C4C] capitalize">
-                        {tableName.replace('_', ' ')}
-                      </h4>
+                      <div className="flex items-center space-x-2 sm:space-x-3">
+                        <button
+                          onClick={() => toggleAllModulePermissions(tableName, permissions)}
+                          className={`w-4 h-4 sm:w-5 sm:h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                            activeCount === permissions.length
+                              ? 'bg-[#5FD3D2] border-[#5FD3D2] text-white'
+                              : activeCount > 0
+                              ? 'bg-[#5FD3D2] border-[#5FD3D2]'
+                              : 'border-gray-300 hover:border-[#5FD3D2]'
+                          }`}
+                          disabled={saving}
+                        >
+                          {activeCount === permissions.length && <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3" />}
+                          {activeCount > 0 && activeCount < permissions.length && (
+                            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full" />
+                          )}
+                        </button>
+                        <h4 className="font-medium text-sm sm:text-base text-[#004C4C] capitalize">
+                          {tableName.replace('_', ' ')}
+                        </h4>
+                      </div>
                       <span className="text-xs text-gray-500 flex-shrink-0">
                         {activeCount}/{permissions.length} activos
                       </span>

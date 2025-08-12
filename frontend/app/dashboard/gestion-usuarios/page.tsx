@@ -19,7 +19,9 @@ import {
   XCircle,
   UserPlus,
   Search,
-  Filter
+  Filter,
+  X,
+  RotateCcw
 } from 'lucide-react'
 import InviteUserModal from '@/components/dashboard/InviteUserModal'
 import EditUserPermissionsModal from '@/components/dashboard/EditUserPermissionsModal'
@@ -52,12 +54,12 @@ export default function UserManagementPage() {
     }
   }, [canManageUsers, permissionsLoading, router])
 
-  // Cargar usuarios
+  // Cargar usuarios cuando los permisos estén listos
   useEffect(() => {
     if (!permissionsLoading && canManageUsers()) {
       fetchUsers()
     }
-  }, [permissionsLoading]) // Solo depende de permissionsLoading
+  }, [permissionsLoading]) // Solo depende de permissionsLoading para evitar loops
 
   const fetchUsers = async () => {
     try {
@@ -128,25 +130,28 @@ export default function UserManagementPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-6 max-w-7xl mx-auto w-full">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-[#004C4C]">
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#004C4C]">
               Gestión de Usuarios
             </h1>
-            <p className="text-[#065C5C] mt-1">
+            <p className="text-[#065C5C] mt-1 text-sm sm:text-base">
               Administra usuarios y sus permisos en el sistema
             </p>
           </div>
           
           <button
-            onClick={() => setShowInviteModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[#5FD3D2] to-[#58BFC2] text-white font-semibold rounded-lg hover:from-[#58BFC2] hover:to-[#5FD3D2] transform hover:scale-105 transition-all duration-200 shadow-lg"
+            onClick={() => {
+              setSearchTerm('') // Limpiar filtro al abrir modal
+              setShowInviteModal(true)
+            }}
+            className="inline-flex items-center justify-center w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-[#5FD3D2] to-[#58BFC2] text-white font-semibold rounded-lg hover:from-[#58BFC2] hover:to-[#5FD3D2] transition-all duration-200 shadow-lg"
           >
-            <UserPlus className="w-5 h-5 mr-2" />
-            Invitar Usuario
+            <UserPlus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+            <span className="text-sm sm:text-base">Invitar Usuario</span>
           </button>
         </div>
       </div>
@@ -163,16 +168,38 @@ export default function UserManagementPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5FD3D2] focus:border-transparent"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
         
-        {/* Filtros */}
-        <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-          <Filter className="w-4 h-4 mr-2" />
-          Filtros
-        </button>
+        {/* Filtros y Limpiar */}
+        <div className="flex gap-2">
+          <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <Filter className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Filtros</span>
+          </button>
+          
+          {(searchTerm) && (
+            <button
+              onClick={() => {
+                setSearchTerm('')
+              }}
+              className="inline-flex items-center px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-all"
+            >
+              <RotateCcw className="w-4 h-4 mr-1.5" />
+              <span className="text-sm font-medium">Limpiar</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Tabla de usuarios */}
+      {/* Lista de usuarios - Responsivo */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center">
@@ -199,28 +226,85 @@ export default function UserManagementPage() {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Usuario
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Permisos
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Último acceso
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+          <>
+            {/* Vista móvil - Tarjetas */}
+            <div className="block lg:hidden space-y-3 p-3">
+              {filteredUsers.map((user) => (
+                <div key={user.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-lg transition-all hover:border-[#5FD3D2]">
+                  <div className="space-y-3">
+                    {/* Header con nombre y estado */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="text-base font-semibold text-gray-900">
+                            {user.email.split('@')[0]}
+                          </h3>
+                          {getStatusBadge(user)}
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {user.email}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user)
+                          setShowEditModal(true)
+                        }}
+                        className="ml-3 p-2.5 bg-[#87E0E0] bg-opacity-20 text-[#004C4C] hover:bg-opacity-30 rounded-lg transition-colors flex-shrink-0"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Información detallada */}
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-1 text-gray-500">
+                          <Shield className="w-4 h-4" />
+                          <span className="text-xs font-medium">Permisos</span>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {user.permissions_count} activos
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-1 text-gray-500">
+                          <Calendar className="w-4 h-4" />
+                          <span className="text-xs font-medium">Último acceso</span>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {formatDate(user.last_sign_in_at)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop - Tabla */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Usuario
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Estado
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Permisos
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Último acceso
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
                 {filteredUsers.map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -271,9 +355,10 @@ export default function UserManagementPage() {
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
