@@ -18,6 +18,8 @@ interface Company {
   updated_by?: string
   archived_at?: string | null
   archived_by?: string | null
+  companies_created_by_handle?: string | null
+  companies_updated_by_handle?: string | null
 }
 
 interface CompanyCardProps {
