@@ -44,7 +44,7 @@ export default function CompanyModal({
 
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [successMessage, setSuccessMessage] = useState('')
+  // Las notificaciones visuales se manejan desde el padre con Toast
 
   // Resetear formulario cuando se abre/cierra el modal
   useEffect(() => {
@@ -62,7 +62,6 @@ export default function CompanyModal({
         })
       }
       setErrors({})
-      setSuccessMessage('')
     }
   }, [isOpen, company, mode])
 
@@ -159,8 +158,9 @@ export default function CompanyModal({
           }])
 
         if (error) throw error
-
-        setSuccessMessage('¡Empresa creada exitosamente!')
+        onSuccess()
+        onClose()
+        return
       } else {
         // Obtener el usuario actual para updated_by
         const { data: { user } } = await supabase.auth.getUser()
@@ -183,15 +183,12 @@ export default function CompanyModal({
           .eq('id', company?.id)
 
         if (error) throw error
-
-        setSuccessMessage('¡Empresa actualizada exitosamente!')
-      }
-
-      // Mostrar mensaje de éxito por 1.5 segundos y cerrar
-      setTimeout(() => {
         onSuccess()
         onClose()
-      }, 1500)
+        return
+      }
+
+      // Éxito ya gestionado
 
     } catch (error: any) {
       console.error('Error saving company:', error)
@@ -209,8 +206,8 @@ export default function CompanyModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] p-4 pb-20 sm:pb-4 overflow-y-auto sm:flex sm:items-start sm:justify-center sm:pt-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[calc(100vh-2rem)] overflow-hidden mx-auto my-6 sm:my-0">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white p-6 flex items-center justify-between">
@@ -236,15 +233,9 @@ export default function CompanyModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(95vh-180px)]">
+        <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)] pb-[env(safe-area-inset-bottom)]">
           
-          {/* Mensaje de éxito */}
-          {successMessage && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 flex items-center space-x-3">
-              <Check className="h-5 w-5 text-green-600" />
-              <span className="text-green-800 font-medium">{successMessage}</span>
-            </div>
-          )}
+          {/* Mensaje de éxito eliminado: padre mostrará Toast */}
 
           {/* Error general */}
           {errors.general && (
@@ -404,7 +395,7 @@ export default function CompanyModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3">
+        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 sticky bottom-0">
           <button
             type="button"
             onClick={onClose}

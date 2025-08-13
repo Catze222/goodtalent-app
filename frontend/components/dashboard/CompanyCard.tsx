@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Building2, Edit3, Archive, RotateCcw, Mail, Phone, User, Calendar, AlertTriangle } from 'lucide-react'
+import { Edit3, Archive, RotateCcw, Mail, Phone, User, Calendar, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 
 interface Company {
@@ -14,7 +14,10 @@ interface Company {
   status: boolean
   created_at: string
   updated_at: string
+  created_by?: string
+  updated_by?: string
   archived_at?: string | null
+  archived_by?: string | null
 }
 
 interface CompanyCardProps {
@@ -134,9 +137,7 @@ export default function CompanyCard({
 
   return (
     <>
-      <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300 relative overflow-hidden ${
-        isArchived ? 'opacity-75 bg-gray-50' : ''
-      }`}>
+      <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300 relative overflow-hidden`}>
         
         {/* Status Badge */}
         <div className="absolute top-4 right-4">
@@ -155,19 +156,14 @@ export default function CompanyCard({
           )}
         </div>
 
-        {/* Company Header */}
-        <div className="flex items-start space-x-4 mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-[#87E0E0] to-[#5FD3D2] rounded-xl flex items-center justify-center shadow-sm">
-            <Building2 className="h-6 w-6 text-[#004C4C]" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold text-gray-900 truncate mb-1">
+        {/* Company Header - banda a todo el ancho de la tarjeta */}
+        <div className="mb-4">
+          <div className="-mx-6 -mt-6 rounded-t-2xl bg-[#F1F5F9] border-b border-gray-200 px-6 py-3 sm:py-4 pr-20">
+            <h3 className="text-sm sm:text-base md:text-lg leading-tight font-bold text-[#004C4C] truncate">
               {company.name}
             </h3>
-            <p className="text-sm text-gray-500">
-              NIT: {company.tax_id}
-            </p>
           </div>
+          <p className="mt-2 text-xs text-gray-500 pr-16">NIT: {company.tax_id}</p>
         </div>
 
         {/* Contact Information */}
@@ -198,18 +194,30 @@ export default function CompanyCard({
           </div>
         </div>
 
-        {/* Metadata */}
+        {/* Metadata (altura consistente y usuarios creador/editor) */}
         <div className="border-t border-gray-100 pt-4 mb-4">
-          <div className="flex items-center space-x-2 text-xs text-gray-500">
-            <Calendar className="h-3 w-3" />
-            <span>Creada: {formatDate(company.created_at)}</span>
-          </div>
-          {company.updated_at !== company.created_at && (
-            <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
+          <div className="flex flex-col space-y-1 text-xs text-gray-500 min-h-[44px]">
+            <div className="flex items-center space-x-2">
               <Calendar className="h-3 w-3" />
-              <span>Actualizada: {formatDate(company.updated_at)}</span>
+              <span>Creada: {formatDate(company.created_at)}</span>
             </div>
-          )}
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-3 w-3" />
+              <span>
+                Actualizada: {company.updated_at !== company.created_at ? formatDate(company.updated_at) : '—'}
+              </span>
+            </div>
+          </div>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-gray-500">
+            <div>
+              <span className="font-medium">Creado por: </span>
+              <span title={company.companies_created_by_handle || ''}>{company.companies_created_by_handle ?? 'N/D'}</span>
+            </div>
+            <div>
+              <span className="font-medium">Editado por: </span>
+              <span title={company.companies_updated_by_handle || ''}>{company.companies_updated_by_handle ?? 'N/D'}</span>
+            </div>
+          </div>
         </div>
 
         {/* Actions */}

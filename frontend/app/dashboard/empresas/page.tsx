@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Building2, Plus, Search, Filter, Archive, RefreshCw } from 'lucide-react'
+import { Building2, Plus, Search, Filter, Archive, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabaseClient'
 import { usePermissions } from '../../../lib/usePermissions'
 import CompanyModal from '../../../components/dashboard/CompanyModal'
 import CompanyCard from '../../../components/dashboard/CompanyCard'
+import Toast from '../../../components/dashboard/Toast'
 
 interface Company {
   id: string
@@ -17,7 +18,11 @@ interface Company {
   status: boolean
   created_at: string
   updated_at: string
+  created_by?: string
+  updated_by?: string
   archived_at?: string | null
+  companies_created_by_handle?: string | null
+  companies_updated_by_handle?: string | null
 }
 
 type FilterStatus = 'all' | 'active' | 'inactive' | 'archived'
@@ -34,6 +39,9 @@ export default function EmpresasPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingCompany, setEditingCompany] = useState<Company | null>(null)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
+  const [toastOpen, setToastOpen] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
+  const [toastType, setToastType] = useState<'success'|'error'|'info'>('success')
 
   const { hasPermission, loading: permissionsLoading } = usePermissions()
   
@@ -57,7 +65,7 @@ export default function EmpresasPage() {
     try {
       const { data, error } = await supabase
         .from('companies')
-        .select('*')
+        .select('*, companies_created_by_handle, companies_updated_by_handle')
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -116,6 +124,10 @@ export default function EmpresasPage() {
   }
 
   const handleModalSuccess = () => {
+    setShowModal(false)
+    setToastType('success')
+    setToastMsg(modalMode === 'create' ? 'Empresa creada exitosamente' : 'Empresa actualizada exitosamente')
+    setToastOpen(true)
     loadCompanies()
   }
 
@@ -168,27 +180,7 @@ export default function EmpresasPage() {
           </div>
         </div>
         
-        <div className="flex space-x-3">
-          <button
-            onClick={loadCompanies}
-            disabled={loading}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-100 transition-colors flex items-center space-x-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            <span>Actualizar</span>
-          </button>
-          
-          {canCreate && (
-            <button 
-              onClick={handleCreateNew}
-              className="bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#065C5C] hover:to-[#0A6A6A] transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center space-x-2"
-            >
-              <Plus className="h-5 w-5" />
-              <span className="hidden sm:inline">Nueva Empresa</span>
-              <span className="sm:hidden">Nueva</span>
-            </button>
-          )}
-        </div>
+        <div className="flex space-x-3" />
       </div>
 
       {/* Search and Filters */}
@@ -202,8 +194,17 @@ export default function EmpresasPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar por nombre, NIT, contacto o email..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all duration-200"
+                className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all duration-200"
               />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="Limpiar búsqueda"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
           <div className="flex space-x-3">
@@ -220,6 +221,12 @@ export default function EmpresasPage() {
                 <option value="archived">Archivadas</option>
               </select>
             </div>
+            <button
+              onClick={() => { setSearchTerm(''); setFilterStatus('all') }}
+              className="px-4 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-100 transition-colors"
+            >
+              Limpiar
+            </button>
           </div>
         </div>
         
@@ -303,6 +310,31 @@ export default function EmpresasPage() {
         company={editingCompany}
         mode={modalMode}
       />
+
+      {/* Floating Action Button móvil */}
+      {canCreate && (
+        <button
+          onClick={handleCreateNew}
+          className="lg:hidden fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full shadow-xl text-white bg-gradient-to-br from-[#004C4C] to-[#065C5C] flex items-center justify-center hover:scale-105 transition-transform"
+          aria-label="Nueva empresa"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
+
+      {/* FAB desktop */}
+      {canCreate && (
+        <button
+          onClick={handleCreateNew}
+          className="hidden lg:flex fixed bottom-8 right-8 z-40 px-5 py-3 rounded-full shadow-xl text-white bg-gradient-to-br from-[#004C4C] to-[#065C5C] items-center space-x-2 hover:scale-105 transition-transform"
+        >
+          <Plus className="h-5 w-5" />
+          <span>Nueva empresa</span>
+        </button>
+      )}
+
+      {/* Toast */}
+      <Toast open={toastOpen} message={toastMsg} type={toastType} onClose={() => setToastOpen(false)} />
     </div>
   )
 }
