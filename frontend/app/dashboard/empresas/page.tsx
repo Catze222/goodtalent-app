@@ -35,7 +35,7 @@ export default function EmpresasPage() {
   const [editingCompany, setEditingCompany] = useState<Company | null>(null)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
 
-  const { hasPermission } = usePermissions()
+  const { hasPermission, loading: permissionsLoading } = usePermissions()
   
   // Verificar permisos
   const canRead = hasPermission('companies', 'view')
@@ -43,8 +43,12 @@ export default function EmpresasPage() {
   const canUpdate = hasPermission('companies', 'edit')
   const canDelete = hasPermission('companies', 'delete')
 
-  // Cargar empresas
+  // Cargar empresas solo cuando los permisos estén listos
   const loadCompanies = async () => {
+    if (permissionsLoading) {
+      return // Esperar a que los permisos carguen
+    }
+    
     if (!canRead) {
       setLoading(false)
       return
@@ -67,8 +71,11 @@ export default function EmpresasPage() {
   }
 
   useEffect(() => {
-    loadCompanies()
-  }, [canRead])
+    // Solo cargar empresas cuando los permisos estén completamente cargados
+    if (!permissionsLoading) {
+      loadCompanies()
+    }
+  }, [canRead, permissionsLoading])
 
   // Filtrar empresas
   const filteredCompanies = companies.filter(company => {
@@ -110,6 +117,18 @@ export default function EmpresasPage() {
 
   const handleModalSuccess = () => {
     loadCompanies()
+  }
+
+  // Mostrar loading mientras los permisos cargan
+  if (permissionsLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+          <div className="w-8 h-8 border-4 border-[#87E0E0] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Verificando permisos...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!canRead) {

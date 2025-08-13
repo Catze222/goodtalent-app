@@ -57,10 +57,11 @@
 - **Crear/Editar/Eliminar:** Solo super admins
 
 **Tabla `user_permissions`:**
-- **Ver:** Usuarios con permiso `user_permissions.view`, super admins, o sus propios permisos
-- **Crear:** Usuarios con permiso `user_permissions.create` o super admins
-- **Editar:** Usuarios con permiso `user_permissions.edit` o super admins
-- **Eliminar:** Usuarios con permiso `user_permissions.delete` o super admins
+- **Ver:** Usuarios pueden ver sus propios permisos, o usuarios con permiso `user_permissions.view`
+- **Crear:** Usuarios con permiso `user_permissions.create` 
+- **Editar:** Usuarios con permiso `user_permissions.edit`
+- **Eliminar:** Usuarios con permiso `user_permissions.delete`
+- **IMPORTANTE:** RLS está HABILITADO y las políticas usan consultas directas sin recursión
 
 ### Funciones Helper:
 
@@ -172,10 +173,11 @@ SELECT has_permission('usuario-123', 'employees', 'view');
 - `idx_companies_archived_at` - Empresas no archivadas
 
 **Seguridad RLS:**
-- **Ver:** Usuarios con permiso `companies` y `can_read = true`
-- **Crear:** Usuarios con permiso `companies` y `can_create = true`
-- **Editar:** Usuarios con permiso `companies` y `can_update = true`
-- **Eliminar:** Usuarios con permiso `companies` y `can_delete = true`
+- **Ver:** Usuarios con permiso `companies.view`
+- **Crear:** Usuarios con permiso `companies.create`
+- **Editar:** Usuarios con permiso `companies.edit`
+- **Eliminar:** Usuarios con permiso `companies.delete`
+- **NOTA:** Las políticas usan la función `has_permission()` con SECURITY DEFINER
 
 **Triggers:**
 - `trigger_companies_updated_at` - Actualiza automáticamente `updated_at` y `updated_by`
@@ -183,4 +185,4 @@ SELECT has_permission('usuario-123', 'employees', 'view');
 ---
 
 *Última actualización: 2025-01-14*
-*Sistema de permisos GOOD Talent v1.1 - Módulo Empresas*
+*Sistema de permisos GOOD Talent v1.2 - RLS Corregido y Módulo Empresas*

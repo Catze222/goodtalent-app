@@ -56,7 +56,13 @@ CREATE TRIGGER trigger_companies_updated_at
 -- Habilitar RLS
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 
--- Política para SELECT: Solo usuarios con permiso 'companies' y 'view'
+-- Eliminar políticas existentes si existen (para re-ejecutar migración)
+DROP POLICY IF EXISTS "companies_select_policy" ON companies;
+DROP POLICY IF EXISTS "companies_insert_policy" ON companies;
+DROP POLICY IF EXISTS "companies_update_policy" ON companies;
+DROP POLICY IF EXISTS "companies_delete_policy" ON companies;
+
+-- Política para SELECT: Si tienes permiso 'view', ves TODAS las empresas (role-based)
 CREATE POLICY "companies_select_policy" ON companies
     FOR SELECT TO authenticated
     USING (
@@ -71,7 +77,7 @@ CREATE POLICY "companies_select_policy" ON companies
         )
     );
 
--- Política para INSERT: Solo usuarios con permiso 'companies' y 'create'
+-- Política para INSERT: Si tienes permiso 'create', puedes crear empresas (role-based)
 CREATE POLICY "companies_insert_policy" ON companies
     FOR INSERT TO authenticated
     WITH CHECK (
@@ -84,10 +90,9 @@ CREATE POLICY "companies_insert_policy" ON companies
             AND up.is_active = true
             AND p.is_active = true
         )
-        AND created_by = auth.uid()
     );
 
--- Política para UPDATE: Solo usuarios con permiso 'companies' y 'edit'
+-- Política para UPDATE: Si tienes permiso 'edit', puedes editar CUALQUIER empresa (role-based)
 CREATE POLICY "companies_update_policy" ON companies
     FOR UPDATE TO authenticated
     USING (
@@ -113,7 +118,7 @@ CREATE POLICY "companies_update_policy" ON companies
         )
     );
 
--- Política para DELETE: Solo usuarios con permiso 'companies' y 'delete'
+-- Política para DELETE: Si tienes permiso 'delete', puedes eliminar CUALQUIER empresa (role-based)
 CREATE POLICY "companies_delete_policy" ON companies
     FOR DELETE TO authenticated
     USING (
