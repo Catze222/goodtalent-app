@@ -135,5 +135,52 @@ SELECT has_permission('usuario-123', 'employees', 'view');
 
 ---
 
-*Última actualización: 2025-01-12*
-*Sistema de permisos GOOD Talent v1.0*
+## 🏢 Tabla de Empresas
+
+### 3. `companies` – Empresas Clientes
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440000` |
+| `name` | TEXT | Nombre de la empresa cliente | `Good Temporal` |
+| `tax_id` | TEXT | NIT o identificación tributaria | `900123456` |
+| `accounts_contact_name` | TEXT | Nombre del contacto de cuentas por cobrar | `María Pérez` |
+| `accounts_contact_email` | TEXT | Email del contacto de cuentas por cobrar | `mperez@good.com` |
+| `accounts_contact_phone` | TEXT | Teléfono del contacto de cuentas por cobrar | `+57 300 123 4567` |
+| `status` | BOOLEAN | Estado: true = activa, false = inactiva | `true` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación del registro | `2025-01-14 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-14 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+| `archived_at` | TIMESTAMPTZ | Fecha de archivado (soft delete) | `NULL` |
+| `archived_by` | UUID (FK) | Usuario que archivó el registro | `NULL` |
+
+**Relaciones:**
+- `created_by` → `auth.users(id)`
+- `updated_by` → `auth.users(id)` 
+- `archived_by` → `auth.users(id)`
+
+**Restricciones:**
+- `UNIQUE(tax_id)` - NIT único por empresa
+- Validación de email en `accounts_contact_email`
+- Lógica de archivado: si `archived_at` no es NULL, `archived_by` debe tener valor
+
+**Índices:**
+- `idx_companies_name` - Búsqueda por nombre
+- `idx_companies_tax_id` - Búsqueda por NIT
+- `idx_companies_status` - Filtro por estado
+- `idx_companies_archived_at` - Empresas no archivadas
+
+**Seguridad RLS:**
+- **Ver:** Usuarios con permiso `companies` y `can_read = true`
+- **Crear:** Usuarios con permiso `companies` y `can_create = true`
+- **Editar:** Usuarios con permiso `companies` y `can_update = true`
+- **Eliminar:** Usuarios con permiso `companies` y `can_delete = true`
+
+**Triggers:**
+- `trigger_companies_updated_at` - Actualiza automáticamente `updated_at` y `updated_by`
+
+---
+
+*Última actualización: 2025-01-14*
+*Sistema de permisos GOOD Talent v1.1 - Módulo Empresas*

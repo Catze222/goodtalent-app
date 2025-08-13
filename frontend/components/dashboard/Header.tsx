@@ -83,15 +83,15 @@ export default function Header({ user }: HeaderProps) {
   }
 
   return (
-    <header className="bg-white border-b border-gray-200 shadow-sm">
+    <header className="bg-gradient-to-r from-[#E6F5F7] via-white to-[#E6F5F7] border-b border-gray-200 shadow-sm">
       <div className="flex items-center justify-between px-4 lg:px-6 py-4">
         
-        {/* Mobile Logo */}
+                {/* Mobile Logo */}
         <div className="lg:hidden flex items-center justify-center">
           <img 
-                          src="https://irvgruylufihzoveycph.supabase.co/storage/v1/object/public/generales/Logo.png"
+            src="https://irvgruylufihzoveycph.supabase.co/storage/v1/object/public/generales/Logo.png"
             alt="GOOD Talent Logo"
-            className="h-8 w-auto object-contain"
+            className="h-12 w-auto object-contain"
           />
         </div>
 
