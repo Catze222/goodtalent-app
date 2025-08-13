@@ -27,14 +27,18 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        console.log('🔍 Processing auth callback...')
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 Processing auth callback...')
+        }
         
         // Verificar si hay hash fragments (Supabase usa #)
         const hash = window.location.hash
         const search = window.location.search
         
-        console.log('🔍 Hash:', hash)
-        console.log('🔍 Search:', search)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 Hash available:', !!hash)
+          console.log('🔍 Search available:', !!search)
+        }
         
         // Primero intentar obtener la sesión actual
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
@@ -52,15 +56,21 @@ export default function AuthCallbackPage() {
           const type = hashParams.get('type')
           const accessToken = hashParams.get('access_token')
           
-          console.log('🔍 Hash type:', type)
-          console.log('🔍 Has access token:', !!accessToken)
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 Hash type:', type)
+            console.log('🔍 Has access token:', !!accessToken)
+          }
           
           if (type === 'invite' && accessToken) {
-            console.log('🎯 Detected invite type from hash')
+            if (process.env.NODE_ENV === 'development') {
+              console.log('🎯 Detected invite type from hash')
+            }
             
             if (sessionData.session?.user) {
               const user = sessionData.session.user
-              console.log('🔍 User from session:', user.email)
+              if (process.env.NODE_ENV === 'development') {
+                console.log('🔍 User from session:', user.email?.substring(0, 3) + '***')
+              }
               
               setUserEmail(user.email || '')
               setIsValidToken(true)
@@ -75,11 +85,15 @@ export default function AuthCallbackPage() {
         const type = urlParams.get('type')
         
         if (type === 'invite') {
-          console.log('🎯 Detected invite type from query params')
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🎯 Detected invite type from query params')
+          }
           
           if (sessionData.session?.user) {
             const user = sessionData.session.user
-            console.log('🔍 User from session:', user.email)
+            if (process.env.NODE_ENV === 'development') {
+              console.log('🔍 User from session:', user.email?.substring(0, 3) + '***')
+            }
             
             setUserEmail(user.email || '')
             setIsValidToken(true)
@@ -91,16 +105,20 @@ export default function AuthCallbackPage() {
         // Método de respaldo: verificar por características del usuario
         if (sessionData.session?.user) {
           const user = sessionData.session.user
-          console.log('🔍 Checking user characteristics:', {
-            email: user.email,
-            email_confirmed_at: user.email_confirmed_at,
-            created_at: user.created_at,
-            last_sign_in_at: user.last_sign_in_at
-          })
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 Checking user characteristics:', {
+              email: user.email?.substring(0, 3) + '***',
+              email_confirmed_at: !!user.email_confirmed_at,
+              created_at: !!user.created_at,
+              last_sign_in_at: !!user.last_sign_in_at
+            })
+          }
           
           // Si el usuario nunca ha hecho login pero está confirmado = invitación
           if (user.email_confirmed_at && !user.last_sign_in_at) {
-            console.log('🎯 Detected invite by login pattern')
+            if (process.env.NODE_ENV === 'development') {
+              console.log('🎯 Detected invite by login pattern')
+            }
             setUserEmail(user.email || '')
             setIsValidToken(true)
             setLoading(false)
@@ -108,13 +126,17 @@ export default function AuthCallbackPage() {
           }
           
           // Si ya hay sesión establecida y ha hecho login antes, ir al dashboard
-          console.log('🔄 Existing user, redirecting to dashboard')
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔄 Existing user, redirecting to dashboard')
+          }
           router.push('/dashboard')
           return
         }
 
         // Si llegamos aquí, no hay sesión válida
-        console.log('❌ No valid session found')
+        if (process.env.NODE_ENV === 'development') {
+          console.log('❌ No valid session found')
+        }
         setError('Link de invitación inválido o expirado')
         
       } catch (err) {

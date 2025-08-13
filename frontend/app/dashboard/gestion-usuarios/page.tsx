@@ -21,10 +21,15 @@ import {
   Search,
   Filter,
   X,
-  RotateCcw
+  RotateCcw,
+  Power,
+  PowerOff,
+  Loader2
 } from 'lucide-react'
 import InviteUserModal from '@/components/dashboard/InviteUserModal'
 import EditUserPermissionsModal from '@/components/dashboard/EditUserPermissionsModal'
+import ConfirmationModal from '@/components/dashboard/ConfirmationModal'
+import NotificationModal from '@/components/dashboard/NotificationModal'
 
 interface UserWithPermissions {
   id: string
@@ -34,18 +39,76 @@ interface UserWithPermissions {
   last_sign_in_at: string | null
   permissions_count: number
   is_active: boolean
+  is_banned: boolean
 }
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState<UserWithPermissions[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<UserWithPermissions | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [togglingUser, setTogglingUser] = useState<string | null>(null)
+  
+  // Estados para modales modernos
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    type: 'warning' | 'danger' | 'success'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'warning'
+  })
+  
+  const [notification, setNotification] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    type: 'success' | 'error' | 'info'
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  })
   
   const router = useRouter()
   const { canManageUsers, loading: permissionsLoading } = usePermissions()
+
+  // Funciones helper para modales
+  const showConfirmation = (title: string, message: string, onConfirm: () => void, type: 'warning' | 'danger' | 'success' = 'warning') => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      type
+    })
+  }
+
+  const showNotification = (title: string, message: string, type: 'success' | 'error' | 'info') => {
+    setNotification({
+      isOpen: true,
+      title,
+      message,
+      type
+    })
+  }
+
+  const closeConfirmModal = () => {
+    setConfirmModal(prev => ({ ...prev, isOpen: false }))
+  }
+
+  const closeNotification = () => {
+    setNotification(prev => ({ ...prev, isOpen: false }))
+  }
 
   // Redirigir si no tiene permisos
   useEffect(() => {
@@ -81,9 +144,101 @@ export default function UserManagementPage() {
     }
   }
 
+  const toggleUserStatus = async (user: UserWithPermissions) => {
+    const { data: session } = await supabase.auth.getSession()
+    const currentUserId = session.session?.user?.id
+    
+    // Prevenir autodesactivación en el frontend también
+    if (!user.is_banned && currentUserId === user.id) {
+      showNotification(
+        'Acción no permitida',
+        'No puedes desactivar tu propia cuenta',
+        'error'
+      )
+      return
+    }
+    
+    const action = user.is_banned ? 'activate' : 'deactivate'
+    const actionText = action === 'activate' ? 'activar' : 'desactivar'
+    
+    // Confirmación para acciones críticas
+    if (action === 'deactivate') {
+      showConfirmation(
+        'Desactivar Usuario',
+        `¿Estás seguro de que quieres desactivar a ${user.email}? El usuario no podrá acceder al sistema hasta que sea reactivado.`,
+        () => executeUserToggle(user, action),
+        'danger'
+      )
+    } else {
+      showConfirmation(
+        'Activar Usuario',
+        `¿Confirmas que quieres activar a ${user.email}? El usuario podrá acceder al sistema nuevamente.`,
+        () => executeUserToggle(user, action),
+        'success'
+      )
+    }
+  }
+
+  const executeUserToggle = async (user: UserWithPermissions, action: string) => {
+    try {
+      setTogglingUser(user.id)
+      closeConfirmModal()
+      
+      const { data: session } = await supabase.auth.getSession()
+      const actionText = action === 'activate' ? 'activar' : 'desactivar'
+      
+      const response = await fetch('/api/toggle-user-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          action: action,
+          userToken: session.session?.access_token
+        })
+      })
+
+      const result = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(result.error || `Error al ${actionText} usuario`)
+      }
+
+      // Mostrar mensaje de éxito
+      showNotification(
+        'Operación Exitosa',
+        `Usuario ${action === 'activate' ? 'activado' : 'desactivado'} correctamente`,
+        'success'
+      )
+      
+      // Esperar un momento antes de refrescar para que Supabase procese el cambio
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Refrescar la lista de usuarios
+      await fetchUsers()
+      
+    } catch (error: any) {
+      console.error('Error toggling user status:', error)
+      showNotification(
+        'Error',
+        error.message || 'Error al cambiar estado del usuario',
+        'error'
+      )
+    } finally {
+      setTogglingUser(null)
+    }
+  }
+
   const filteredUsers = users.filter(user =>
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  // Debounce para búsqueda
+  useEffect(() => {
+    const id = setTimeout(() => setSearchTerm(searchInput), 250)
+    return () => clearTimeout(id)
+  }, [searchInput])
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Nunca'
@@ -104,6 +259,15 @@ export default function UserManagementPage() {
       )
     }
     
+    if (user.is_banned) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <XCircle className="w-3 h-3 mr-1" />
+          Desactivado
+        </span>
+      )
+    }
+    
     if (user.is_active) {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -114,7 +278,7 @@ export default function UserManagementPage() {
     }
 
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
         <XCircle className="w-3 h-3 mr-1" />
         Inactivo
       </span>
@@ -160,17 +324,17 @@ export default function UserManagementPage() {
       <div className="mb-6 flex flex-col lg:flex-row gap-4">
         {/* Búsqueda */}
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
             type="text"
             placeholder="Buscar por email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5FD3D2] focus:border-transparent"
           />
-          {searchTerm && (
+          {searchInput && (
             <button
-              onClick={() => setSearchTerm('')}
+              onClick={() => { setSearchInput(''); setSearchTerm('') }}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <X className="w-4 h-4" />
@@ -188,6 +352,7 @@ export default function UserManagementPage() {
           {(searchTerm) && (
             <button
               onClick={() => {
+                setSearchInput('')
                 setSearchTerm('')
               }}
               className="inline-flex items-center px-3 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 transition-all"
@@ -216,7 +381,7 @@ export default function UserManagementPage() {
               {searchTerm ? 'No se encontraron usuarios con ese criterio.' : 'Comienza invitando tu primer usuario.'}
             </p>
             {!searchTerm && (
-              <button
+          <button
                 onClick={() => setShowInviteModal(true)}
                 className="inline-flex items-center px-4 py-2 bg-[#5FD3D2] text-white rounded-lg hover:bg-[#58BFC2] transition-colors"
               >
@@ -231,33 +396,27 @@ export default function UserManagementPage() {
             <div className="block lg:hidden space-y-3 p-3">
               {filteredUsers.map((user) => (
                 <div key={user.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-lg transition-all hover:border-[#5FD3D2]">
-                  <div className="space-y-3">
-                    {/* Header con nombre y estado */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <h3 className="text-base font-semibold text-gray-900">
-                            {user.email.split('@')[0]}
-                          </h3>
-                          {getStatusBadge(user)}
-                        </div>
-                        <p className="text-sm text-gray-600">
+                  <div className="space-y-4">
+                    
+                    {/* Header con nombre completo */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0 pr-2">
+                        <h3 className="text-base font-semibold text-gray-900 truncate">
+                          {user.email.split('@')[0]}
+                        </h3>
+                        <p className="text-sm text-gray-600 truncate">
                           {user.email}
                         </p>
                       </div>
-                      <button
-                        onClick={() => {
-                          setSelectedUser(user)
-                          setShowEditModal(true)
-                        }}
-                        className="ml-3 p-2.5 bg-[#87E0E0] bg-opacity-20 text-[#004C4C] hover:bg-opacity-30 rounded-lg transition-colors flex-shrink-0"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
+                      
+                      {/* Estado - ahora en la esquina superior derecha */}
+                      <div className="flex-shrink-0">
+                        {getStatusBadge(user)}
+                      </div>
                     </div>
 
                     {/* Información detallada */}
-                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                    <div className="grid grid-cols-2 gap-4 py-2">
                       <div className="space-y-1">
                         <div className="flex items-center space-x-1 text-gray-500">
                           <Shield className="w-4 h-4" />
@@ -276,6 +435,45 @@ export default function UserManagementPage() {
                           {formatDate(user.last_sign_in_at)}
                         </p>
                       </div>
+                    </div>
+
+                    {/* Controles - ahora en la parte inferior separada */}
+                    <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
+                      {/* Botón Activar/Desactivar */}
+                      {user.email_confirmed_at && (
+                        <button
+                          onClick={() => toggleUserStatus(user)}
+                          disabled={togglingUser === user.id}
+                          className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-all text-xs font-medium ${
+                            user.is_banned
+                              ? 'bg-green-50 text-green-600 hover:bg-green-100 border border-green-200'
+                              : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                          } ${togglingUser === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {togglingUser === user.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : user.is_banned ? (
+                            <Power className="w-3 h-3" />
+                          ) : (
+                            <PowerOff className="w-3 h-3" />
+                          )}
+                          <span className="hidden sm:inline">
+                            {user.is_banned ? 'Activar' : 'Desactivar'}
+                          </span>
+                        </button>
+                      )}
+                      
+                      {/* Botón Editar Permisos */}
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user)
+                          setShowEditModal(true)
+                        }}
+                        className="flex items-center space-x-1 px-3 py-2 bg-[#87E0E0] bg-opacity-20 text-[#004C4C] hover:bg-opacity-30 rounded-lg transition-colors text-xs font-medium"
+                      >
+                        <Edit className="w-3 h-3" />
+                        <span className="hidden sm:inline">Editar</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -342,16 +540,42 @@ export default function UserManagementPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => {
-                          setSelectedUser(user)
-                          setShowEditModal(true)
-                        }}
-                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md text-[#004C4C] bg-[#87E0E0] bg-opacity-20 hover:bg-opacity-30 transition-colors"
-                      >
-                        <Edit className="w-4 h-4 mr-1" />
-                        Editar
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        {/* Botón Activar/Desactivar */}
+                        {user.email_confirmed_at && (
+                          <button
+                            onClick={() => toggleUserStatus(user)}
+                            disabled={togglingUser === user.id}
+                            className={`inline-flex items-center px-2 py-1 border text-xs leading-4 font-medium rounded-md transition-colors ${
+                              user.is_banned
+                                ? 'text-green-700 bg-green-100 hover:bg-green-200 border-green-300'
+                                : 'text-red-700 bg-red-100 hover:bg-red-200 border-red-300'
+                            } ${togglingUser === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title={user.is_banned ? 'Activar usuario' : 'Desactivar usuario'}
+                          >
+                            {togglingUser === user.id ? (
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            ) : user.is_banned ? (
+                              <Power className="w-3 h-3 mr-1" />
+                            ) : (
+                              <PowerOff className="w-3 h-3 mr-1" />
+                            )}
+                            {user.is_banned ? 'Activar' : 'Desactivar'}
+                          </button>
+                        )}
+                        
+                        {/* Botón Editar Permisos */}
+                        <button
+                          onClick={() => {
+                            setSelectedUser(user)
+                            setShowEditModal(true)
+                          }}
+                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md text-[#004C4C] bg-[#87E0E0] bg-opacity-20 hover:bg-opacity-30 transition-colors"
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Editar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -398,6 +622,26 @@ export default function UserManagementPage() {
           }
         }}
         user={selectedUser ? { id: selectedUser.id, email: selectedUser.email } : null}
+      />
+
+      {/* Modales Modernos */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        loading={togglingUser !== null}
+        confirmText={confirmModal.type === 'danger' ? 'Desactivar' : 'Activar'}
+      />
+
+      <NotificationModal
+        isOpen={notification.isOpen}
+        onClose={closeNotification}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
       />
     </div>
   )

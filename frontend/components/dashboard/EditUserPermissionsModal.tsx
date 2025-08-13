@@ -91,6 +91,10 @@ export default function EditUserPermissionsModal({
     }
   }
 
+  const retryFetch = async () => {
+    await fetchUserPermissions()
+  }
+
   const isPermissionActive = (tableName: string, action: string): boolean => {
     // Check if there's a pending change for this permission
     const change = changes.find(c => c.table_name === tableName && c.action === action)
@@ -270,10 +274,15 @@ export default function EditUserPermissionsModal({
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 sm:mb-6 flex items-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg flex-shrink-0">
+          <div className="mb-4 sm:mb-6 flex items-center justify-between text-red-600 bg-red-50 p-3 rounded-lg flex-shrink-0">
+            <div className="flex items-center space-x-2">
               <AlertCircle className="w-4 h-4" />
               <span className="text-sm">{error}</span>
             </div>
+            <button onClick={retryFetch} className="text-sm px-3 py-1 bg-white border border-red-200 rounded hover:bg-red-100 transition-colors">
+              Reintentar
+            </button>
+          </div>
           )}
 
           {/* Permissions List */}

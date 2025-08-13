@@ -37,15 +37,20 @@ export async function POST(request: NextRequest) {
                   request.headers.get('referer')?.split('/').slice(0, 3).join('/') ||
                   `https://${request.headers.get('host')}`
 
-    // Debug logging para troubleshooting
-    console.log('🔍 API Route - Request Headers:', {
-      origin: request.headers.get('origin'),
-      referer: request.headers.get('referer'),
-      host: request.headers.get('host'),
-      'user-agent': request.headers.get('user-agent')
-    })
-    console.log('🔍 API Route - Determined origin:', origin)
-    console.log('🔍 API Route - Request body:', { email, redirectTo })
+    // Debug logging solo en desarrollo
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 API Route - Request Headers:', {
+        origin: request.headers.get('origin'),
+        referer: request.headers.get('referer'),
+        host: request.headers.get('host')
+        // user-agent removido por privacidad
+      })
+      console.log('🔍 API Route - Determined origin:', origin)
+      console.log('🔍 API Route - Request body:', { 
+        email: email.substring(0, 3) + '***', // Email parcialmente oculto
+        redirectTo 
+      })
+    }
 
     // Verificar que el usuario tiene permisos de admin
     // Crear cliente con el token del usuario para verificar permisos
@@ -82,25 +87,29 @@ export async function POST(request: NextRequest) {
     // Usar el redirectTo del frontend o construir con el origin del request
     const finalRedirectTo = redirectTo || `${origin}/auth/callback`
     
-    console.log('🔍 API Route - Final invite config:', {
-      email,
-      finalRedirectTo,
-      originalRedirectTo: redirectTo,
-      origin,
-      timestamp: new Date().toISOString()
-    })
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 API Route - Final invite config:', {
+        email: email.substring(0, 3) + '***',
+        finalRedirectTo,
+        originalRedirectTo: redirectTo,
+        origin,
+        timestamp: new Date().toISOString()
+      })
+    }
     
     // Invitar usuario usando Service Role Key
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       redirectTo: finalRedirectTo
     })
 
-    console.log('🔍 API Route - Supabase invite response:', {
-      success: !error,
-      userId: data?.user?.id,
-      error: error?.message,
-      timestamp: new Date().toISOString()
-    })
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 API Route - Supabase invite response:', {
+        success: !error,
+        userId: data?.user?.id ? data.user.id.substring(0, 8) + '***' : undefined, // User ID parcialmente oculto
+        error: error?.message,
+        timestamp: new Date().toISOString()
+      })
+    }
 
     if (error) {
       console.error('Error inviting user:', error)

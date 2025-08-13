@@ -33,6 +33,9 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
   const [selectedPermissions, setSelectedPermissions] = useState<SelectedPermissions>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [statusMessage, setStatusMessage] = useState('')
+  const [progressCurrent, setProgressCurrent] = useState(0)
+  const [progressTotal, setProgressTotal] = useState(0)
   const [step, setStep] = useState<'email' | 'permissions' | 'confirm'>('email')
   
   const { groupedPermissions, loading: permissionsLoading } = useAvailablePermissions()
@@ -98,42 +101,62 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
     try {
       setLoading(true)
       setError('')
+      setStatusMessage('Enviando invitación...')
+      setProgressCurrent(0)
+      setProgressTotal(0)
 
       // 1. Obtener sesión actual
       const { data: session } = await supabase.auth.getSession()
       const currentUser = await supabase.auth.getUser()
       
-      // 2. Invitar usuario usando API route
-      console.log('🔍 Sending invite request:', {
+      // 2. Invitar usuario usando API route con timeout y 1 reintento
+      const fetchWithTimeout = async (input: RequestInfo | URL, init: RequestInit & { timeoutMs?: number }) => {
+        const { timeoutMs = 15000, ...rest } = init
+        const controller = new AbortController()
+        const id = setTimeout(() => controller.abort(), timeoutMs)
+        try {
+          const res = await fetch(input, { ...rest, signal: controller.signal })
+          return res
+        } finally {
+          clearTimeout(id)
+        }
+      }
+
+      const requestBody = {
         email,
         redirectTo: `${window.location.origin}/auth/callback`,
-        origin: window.location.origin,
-        timestamp: new Date().toISOString()
-      })
+        userToken: session.session?.access_token
+      }
 
-      const response = await fetch('/api/invite-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          redirectTo: `${window.location.origin}/auth/callback`,
-          userToken: session.session?.access_token
+      let response: Response
+      try {
+        response = await fetchWithTimeout('/api/invite-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          timeoutMs: 15000
         })
-      })
+      } catch (err: any) {
+        // Reintento una vez en caso de timeout o red
+        setStatusMessage('Conexión inestable. Reintentando...')
+        response = await fetchWithTimeout('/api/invite-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+          timeoutMs: 15000
+        })
+      }
 
       const result = await response.json()
 
-      console.log('🔍 Invite API response:', {
-        ok: response.ok,
-        status: response.status,
-        result,
-        timestamp: new Date().toISOString()
-      })
-
       if (!response.ok) {
-        throw new Error(result.error || 'Error al invitar usuario')
+        const message: string = (result?.error as string) || 'Error al invitar usuario'
+        // Mapear errores conocidos a mensajes claros
+        const normalized = message.toLowerCase()
+        if (normalized.includes('already been registered') || normalized.includes('already exists')) {
+          throw new Error('Este correo ya tiene cuenta o una invitación pendiente.')
+        }
+        throw new Error(message)
       }
 
       if (!result.user?.id) {
@@ -149,8 +172,15 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
         throw new Error('Usuario no autenticado')
       }
 
-      // Procesar permisos de manera más robusta
+      // Procesar permisos con feedback de progreso
       const permissionErrors: string[] = []
+      const allActions = Object.values(selectedPermissions).reduce((acc, actions) => acc + actions.length, 0)
+      setProgressTotal(allActions)
+      if (allActions > 0) {
+        setStatusMessage(`Invitación enviada. Asignando permisos... (0/${allActions})`)
+      } else {
+        setStatusMessage('Invitación enviada.')
+      }
       
       for (const [tableName, actions] of Object.entries(selectedPermissions)) {
         for (const action of actions) {
@@ -184,15 +214,25 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
             console.error(`Error processing permission ${tableName}.${action}:`, permError)
             permissionErrors.push(`${tableName}.${action}`)
           }
+          setProgressCurrent(prev => {
+            const next = prev + 1
+            if (allActions > 0) {
+              setStatusMessage(`Invitación enviada. Asignando permisos... (${next}/${allActions})`)
+            }
+            return next
+          })
         }
       }
 
       // Mostrar advertencia si hubo errores en permisos, pero continuar
       if (permissionErrors.length > 0) {
         console.warn('Some permissions could not be assigned:', permissionErrors)
+        // Mensaje no bloqueante para el usuario
+        setError('Algunos permisos no pudieron asignarse. Puedes revisarlos luego en Editar permisos.')
       }
 
       // Éxito - resetear estado ANTES de llamar callbacks
+      setStatusMessage('Listo. Actualizando usuarios...')
       resetForm() // Limpiar estado inmediatamente
       
       // Llamar callbacks después del reset
@@ -203,6 +243,7 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
       console.error('Error inviting user:', error)
       setError(error.message || 'Error al invitar usuario')
       setLoading(false) // Solo resetear loading en caso de error
+      setStatusMessage('')
     }
   }
 
@@ -472,6 +513,11 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
       {/* Scrollable Content Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="space-y-4 sm:space-y-6">
+          {statusMessage && (
+            <div className="p-3 rounded-lg bg-[#87E0E0] bg-opacity-20 text-[#004C4C] text-sm">
+              {statusMessage}
+            </div>
+          )}
           <div className="bg-gray-50 p-4 rounded-lg">
             <h4 className="font-medium text-[#004C4C] mb-2">Usuario a invitar:</h4>
             <p className="text-gray-700">{email}</p>
@@ -530,12 +576,16 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Enviando invitación...</span>
+                <span className="text-sm">
+                  {progressTotal > 0
+                    ? `Asignando permisos... (${progressCurrent}/${progressTotal})`
+                    : 'Enviando invitación...'}
+                </span>
               </>
             ) : (
               <>
                 <UserPlus className="w-4 h-4" />
-                <span className="text-sm">Enviar Invitación</span>
+                <span className="text-sm">{error ? 'Reintentar' : 'Enviar Invitación'}</span>
               </>
             )}
           </button>
