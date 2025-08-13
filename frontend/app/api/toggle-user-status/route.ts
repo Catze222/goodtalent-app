@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     if (process.env.NODE_ENV === 'development') {
       console.log('🔍 Current user state:', {
         userId: userId.substring(0, 8) + '***',
-        banned_until: currentUser.user.banned_until,
+        banned_until: (currentUser.user as any).banned_until,
         email_confirmed_at: currentUser.user.email_confirmed_at,
         user_metadata: currentUser.user.user_metadata,
         app_metadata: currentUser.user.app_metadata
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
         error: result.error?.message,
         userId: userId.substring(0, 8) + '***',
         newUserState: result.data?.user ? {
-          banned_until: result.data.user.banned_until,
+          banned_until: (result.data.user as any).banned_until,
           email: result.data.user.email?.substring(0, 3) + '***'
         } : 'no user data'
       })
