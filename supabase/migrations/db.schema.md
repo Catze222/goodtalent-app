@@ -69,7 +69,7 @@
 - `is_super_admin(user_id)` - Verifica si un usuario es super administrador
 - `my_permissions()` - Lista los permisos del usuario actual
 - `create_super_admin(user_id)` - Otorga todos los permisos a un usuario
-- `get_users_with_permissions()` - Obtiene todos los usuarios con conteo de permisos y estado de ban
+- `get_users_with_permissions()` - Obtiene todos los usuarios con conteo de permisos, `is_active` (confirmado y no baneado) y `is_banned`
 - `get_user_permissions(user_id)` - Obtiene todos los permisos de un usuario específico
 - `assign_permission_to_user(user_id, permission_id, assigned_by)` - Asigna un permiso a un usuario
 - `revoke_permission_from_user(user_id, permission_id)` - Revoca un permiso de un usuario

@@ -475,10 +475,12 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
             </button>
             <button
               onClick={() => setStep('confirm')}
-              disabled={loading || getSelectedPermissionsCount() === 0}
+              disabled={loading || permissionsLoading}
               className="w-full sm:w-auto flex items-center justify-center space-x-2 px-4 sm:px-6 py-2 bg-gradient-to-r from-[#5FD3D2] to-[#58BFC2] text-white rounded-lg hover:from-[#58BFC2] hover:to-[#5FD3D2] transition-all disabled:opacity-50 font-medium"
             >
-              <span className="text-sm">Revisar Invitación</span>
+              <span className="text-sm">
+                {getSelectedPermissionsCount() > 0 ? 'Revisar Invitación' : 'Continuar sin permisos'}
+              </span>
             </button>
           </div>
         </div>
