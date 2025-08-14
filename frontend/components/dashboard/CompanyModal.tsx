@@ -216,8 +216,8 @@ export default function CompanyModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] p-4 pb-20 sm:pb-0 flex items-center justify-center sm:items-start sm:justify-center sm:pt-4 overflow-hidden">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto my-6 sm:my-0 flex flex-col max-h-[calc(100dvh-2rem)]">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] p-4 flex items-center justify-center overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto my-0 flex flex-col h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] sm:h-auto sm:max-h-[calc(100vh-4rem)]">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white p-6 flex items-center justify-between">
@@ -243,7 +243,7 @@ export default function CompanyModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 flex-1 min-h-0 overflow-y-auto overscroll-contain pb-28 pb-[env(safe-area-inset-bottom)]">
+        <div className="p-6 flex-1 min-h-0 overflow-y-auto overscroll-contain">
           
           {/* Mensaje de éxito eliminado: padre mostrará Toast */}
 
@@ -405,7 +405,7 @@ export default function CompanyModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 sticky bottom-0">
+        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3">
           <button
             type="button"
             onClick={onClose}
