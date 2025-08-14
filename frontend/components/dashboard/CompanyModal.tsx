@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Building2, FileText, User, Mail, Phone, Check, AlertCircle } from 'lucide-react'
+import { X, Building2, User, Mail, Phone, AlertCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 
 interface Company {
@@ -45,6 +45,16 @@ export default function CompanyModal({
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   // Las notificaciones visuales se manejan desde el padre con Toast
+
+  // Bloquear scroll del body cuando el modal está abierto
+  useEffect(() => {
+    if (!isOpen) return
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [isOpen])
 
   // Resetear formulario cuando se abre/cierra el modal
   useEffect(() => {
@@ -206,8 +216,8 @@ export default function CompanyModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] p-4 pb-20 sm:pb-4 overflow-y-auto sm:flex sm:items-start sm:justify-center sm:pt-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[calc(100vh-2rem)] overflow-hidden mx-auto my-6 sm:my-0">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] p-4 pb-20 sm:pb-4 flex items-center justify-center sm:items-start sm:justify-center sm:pt-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto my-6 sm:my-0 flex flex-col max-h-[calc(100dvh-2rem)]">
         
         {/* Header */}
         <div className="bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white p-6 flex items-center justify-between">
@@ -233,7 +243,7 @@ export default function CompanyModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(100vh-180px)] pb-[env(safe-area-inset-bottom)]">
+        <div className="p-6 flex-1 min-h-0 overflow-y-auto pb-28 pb-[env(safe-area-inset-bottom)]">
           
           {/* Mensaje de éxito eliminado: padre mostrará Toast */}
 
