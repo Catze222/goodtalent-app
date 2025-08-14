@@ -216,7 +216,7 @@ export default function CompanyModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] p-4 pb-20 sm:pb-4 flex items-center justify-center sm:items-start sm:justify-center sm:pt-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] p-4 pb-20 sm:pb-0 flex items-center justify-center sm:items-start sm:justify-center sm:pt-4 overflow-hidden">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto my-6 sm:my-0 flex flex-col max-h-[calc(100dvh-2rem)]">
         
         {/* Header */}
@@ -243,7 +243,7 @@ export default function CompanyModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 flex-1 min-h-0 overflow-y-auto pb-28 pb-[env(safe-area-inset-bottom)]">
+        <div className="p-6 flex-1 min-h-0 overflow-y-auto overscroll-contain pb-28 pb-[env(safe-area-inset-bottom)]">
           
           {/* Mensaje de éxito eliminado: padre mostrará Toast */}
 
