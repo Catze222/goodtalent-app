@@ -505,7 +505,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="text"
-                      value={formData.segundo_nombre}
+                      value={formData.segundo_nombre || ''}
                       onChange={(e) => handleInputChange('segundo_nombre', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                       placeholder="Ej: Carlos"
@@ -536,7 +536,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="text"
-                      value={formData.segundo_apellido}
+                      value={formData.segundo_apellido || ''}
                       onChange={(e) => handleInputChange('segundo_apellido', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                       placeholder="Ej: González"
@@ -615,7 +615,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="tel"
-                      value={formData.celular}
+                      value={formData.celular || ''}
                       onChange={(e) => handleInputChange('celular', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                       placeholder="Ej: +57 300 123 4567"
@@ -628,7 +628,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="email"
-                      value={formData.email}
+                      value={formData.email || ''}
                       onChange={(e) => handleInputChange('email', e.target.value)}
                       className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
                         errors.email ? 'border-red-300' : 'border-gray-300'
@@ -692,7 +692,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="text"
-                      value={formData.ciudad_labora}
+                      value={formData.ciudad_labora || ''}
                       onChange={(e) => handleInputChange('ciudad_labora', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                       placeholder="Ej: Bogotá"
@@ -705,7 +705,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="text"
-                      value={formData.cargo}
+                      value={formData.cargo || ''}
                       onChange={(e) => handleInputChange('cargo', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                       placeholder="Ej: Desarrollador"
@@ -749,7 +749,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="date"
-                      value={formData.fecha_ingreso}
+                      value={formData.fecha_ingreso || ''}
                       onChange={(e) => handleInputChange('fecha_ingreso', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                     />
@@ -760,7 +760,7 @@ export default function ContractModal({
                       Tipo de Contrato
                     </label>
                     <select
-                      value={formData.tipo_contrato}
+                      value={formData.tipo_contrato || ''}
                       onChange={(e) => handleInputChange('tipo_contrato', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                     >
@@ -779,7 +779,7 @@ export default function ContractModal({
                       </label>
                       <input
                         type="date"
-                        value={formData.fecha_fin}
+                        value={formData.fecha_fin || ''}
                         onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
                         className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
                           errors.fecha_fin ? 'border-red-300' : 'border-gray-300'
@@ -796,7 +796,7 @@ export default function ContractModal({
                       Tipo de Salario
                     </label>
                     <select
-                      value={formData.tipo_salario}
+                      value={formData.tipo_salario || ''}
                       onChange={(e) => handleInputChange('tipo_salario', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                     >
@@ -846,7 +846,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="text"
-                      value={formData.auxilio_salarial_concepto}
+                      value={formData.auxilio_salarial_concepto || ''}
                       onChange={(e) => handleInputChange('auxilio_salarial_concepto', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                       placeholder="Ej: Transporte"
@@ -874,7 +874,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="text"
-                      value={formData.auxilio_no_salarial_concepto}
+                      value={formData.auxilio_no_salarial_concepto || ''}
                       onChange={(e) => handleInputChange('auxilio_no_salarial_concepto', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                       placeholder="Ej: Alimentación"
@@ -979,7 +979,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="date"
-                      value={formData.fecha_solicitud}
+                      value={formData.fecha_solicitud || ''}
                       onChange={(e) => handleInputChange('fecha_solicitud', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                     />
@@ -991,7 +991,7 @@ export default function ContractModal({
                     </label>
                     <input
                       type="date"
-                      value={formData.fecha_radicado}
+                      value={formData.fecha_radicado || ''}
                       onChange={(e) => handleInputChange('fecha_radicado', e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                     />
@@ -1038,7 +1038,7 @@ export default function ContractModal({
                   </label>
                   <input
                     type="url"
-                    value={formData.dropbox}
+                                          value={formData.dropbox || ''}
                     onChange={(e) => handleInputChange('dropbox', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
                     placeholder="https://dropbox.com/folder/contract-001"
@@ -1052,7 +1052,7 @@ export default function ContractModal({
                   </label>
                   <textarea
                     rows={4}
-                    value={formData.observacion}
+                                          value={formData.observacion || ''}
                     onChange={(e) => handleInputChange('observacion', e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all resize-none"
                     placeholder="Notas adicionales sobre el contrato o proceso de onboarding..."
