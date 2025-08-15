@@ -45,6 +45,8 @@ interface UserWithPermissions {
 export default function UserManagementPage() {
   const [users, setUsers] = useState<UserWithPermissions[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingRef, setLoadingRef] = useState(false) // Prevent multiple simultaneous loads
+  const [dataLoaded, setDataLoaded] = useState(false) // Track if data was loaded before
   const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [showInviteModal, setShowInviteModal] = useState(false)
@@ -80,7 +82,10 @@ export default function UserManagementPage() {
   })
   
   const router = useRouter()
-  const { canManageUsers, loading: permissionsLoading } = usePermissions()
+  const { canManageUsers, loading: permissionsLoading, permissions } = usePermissions()
+
+  // Verificar permiso de gestión de usuarios (reactivo)
+  const hasManagePermission = canManageUsers()
 
   // Funciones helper para modales
   const showConfirmation = (title: string, message: string, onConfirm: () => void, type: 'warning' | 'danger' | 'success' = 'warning') => {
@@ -112,20 +117,52 @@ export default function UserManagementPage() {
 
   // Redirigir si no tiene permisos
   useEffect(() => {
-    if (!permissionsLoading && !canManageUsers()) {
+    if (!permissionsLoading && !hasManagePermission) {
       router.push('/dashboard')
     }
-  }, [canManageUsers, permissionsLoading, router])
+  }, [hasManagePermission, permissionsLoading, router])
 
   // Cargar usuarios cuando los permisos estén listos
   useEffect(() => {
-    if (!permissionsLoading && canManageUsers()) {
+    // SOLO cargar si realmente hay cambios significativos
+    const shouldLoad = !permissionsLoading && permissions.length > 0 && hasManagePermission && !dataLoaded && !loadingRef
+    
+    if (shouldLoad) {
       fetchUsers()
+    } else if (!permissionsLoading && permissions.length === 0) {
+      setLoading(false)
+    } else if (dataLoaded) {
+      setLoading(false)
     }
-  }, [permissionsLoading]) // Solo depende de permissionsLoading para evitar loops
+  }, [permissionsLoading, permissions.length, hasManagePermission, dataLoaded]) // Reactivo a cambios
 
   const fetchUsers = async () => {
+    if (loadingRef) {
+      return
+    }
+
+    // Verificar cache primero
+    const cachedData = localStorage.getItem('users_cache')
+    if (cachedData && !dataLoaded) {
+      try {
+        const parsed = JSON.parse(cachedData)
+        const cacheAge = Date.now() - parsed.timestamp
+        
+        if (cacheAge < 300000) { // 5 minutos
+          setUsers(parsed.data)
+          setDataLoaded(true)
+          setLoading(false)
+          return
+        } else {
+          localStorage.removeItem('users_cache')
+        }
+      } catch (e) {
+        localStorage.removeItem('users_cache')
+      }
+    }
+
     try {
+      setLoadingRef(true)
       setLoading(true)
       
       // Obtener usuarios de auth.users con conteo de permisos
@@ -136,11 +173,21 @@ export default function UserManagementPage() {
         return
       }
 
-      setUsers(data || [])
+      const usersData = data || []
+      
+      // Guardar en cache
+      localStorage.setItem('users_cache', JSON.stringify({
+        data: usersData,
+        timestamp: Date.now()
+      }))
+      
+      setUsers(usersData)
+      setDataLoaded(true)
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error fetching users:', error)
     } finally {
       setLoading(false)
+      setLoadingRef(false)
     }
   }
 
@@ -285,7 +332,7 @@ export default function UserManagementPage() {
     )
   }
 
-  if (permissionsLoading || !canManageUsers()) {
+  if (permissionsLoading || !hasManagePermission) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#5FD3D2]"></div>

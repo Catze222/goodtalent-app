@@ -1,61 +1,31 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
-import { User } from '@supabase/supabase-js'
+import { usePermissions } from '../../lib/usePermissions'
 import Sidebar from '../../components/dashboard/Sidebar'
 import Header from '../../components/dashboard/Header'
 import BottomNavigation from '../../components/dashboard/BottomNavigation'
 
 /**
  * Layout principal del dashboard con autenticación y navegación
- * Verifica que el usuario esté logueado antes de mostrar contenido
+ * Ahora usa el contexto global de permisos para evitar verificaciones duplicadas
  */
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = usePermissions()
   const router = useRouter()
 
+  // Redirigir si no hay usuario logueado
   useEffect(() => {
-    // Verificar autenticación al cargar
-    const checkAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error || !session) {
-          router.push('/')
-          return
-        }
-
-        setUser(session.user)
-      } catch (error) {
-        console.error('Error checking auth:', error)
-        router.push('/')
-      } finally {
-        setLoading(false)
-      }
+    if (!loading && !user) {
+      console.log('🔄 No user found, redirecting to login')
+      router.push('/')
     }
-
-    checkAuth()
-
-    // Escuchar cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
-          router.push('/')
-        } else if (session) {
-          setUser(session.user)
-        }
-      }
-    )
-
-    return () => subscription.unsubscribe()
-  }, [router])
+  }, [user, loading, router])
 
   if (loading) {
     return (
@@ -80,7 +50,7 @@ export default function DashboardLayout({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <Header user={user} />
+        <Header />
         
         {/* Page Content */}
         <main className="flex-1 p-4 lg:p-6 overflow-auto pb-20 lg:pb-6">

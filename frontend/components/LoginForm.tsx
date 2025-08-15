@@ -45,7 +45,6 @@ export default function LoginForm() {
         setErrorWithTimeout(translateError(authError.message))
       } else {
         // Login successful - redirect to dashboard
-        console.log('Login successful:', data)
         router.push('/dashboard')
       }
     } catch (err) {

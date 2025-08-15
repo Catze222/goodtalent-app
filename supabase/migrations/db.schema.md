@@ -1,4 +1,6 @@
 # 📊 Schema de Base de Datos - GOOD Talent
+## Estado: CONSOLIDADO v2.0
+*Última actualización: 2025-01-15*
 
 ## 🎯 Tablas del Sistema de Permisos
 
@@ -7,7 +9,7 @@
 | Columna | Tipo | Descripción | Ejemplo |
 |---------|------|-------------|---------|
 | `id` | UUID (PK) | Identificador único del permiso | `abc-123-def-456` |
-| `table_name` | TEXT | Nombre de la tabla/módulo | `contracts`, `employees` |
+| `table_name` | TEXT | Nombre de la tabla/módulo | `contracts`, `companies` |
 | `action` | TEXT | Acción permitida | `view`, `create`, `edit`, `delete` |
 | `description` | TEXT | Descripción legible del permiso | `"Ver contratos laborales"` |
 | `is_active` | BOOLEAN | Si el permiso está activo | `true`, `false` |
@@ -73,6 +75,9 @@
 - `get_user_permissions(user_id)` - Obtiene todos los permisos de un usuario específico
 - `assign_permission_to_user(user_id, permission_id, assigned_by)` - Asigna un permiso a un usuario
 - `revoke_permission_from_user(user_id, permission_id)` - Revoca un permiso de un usuario
+- `get_user_handle(user_id)` - Obtiene la parte local del email (antes de @) de un usuario
+- `companies_created_by_handle(company)` - Computed column: handle del creador de empresa
+- `companies_updated_by_handle(company)` - Computed column: handle del editor de empresa
 
 ---
 
@@ -84,7 +89,7 @@
 |--------|---------------------|-------------|
 | `permissions` | `view` | Ver catálogo de permisos |
 | `user_permissions` | `view`, `create`, `edit`, `delete` | Gestionar asignaciones de permisos |
-| `employees` | `view`, `create`, `edit`, `delete`, `archive` | Gestión de empleados |
+
 | `companies` | `view`, `create`, `edit`, `delete` | Gestión de empresas |
 | `contracts` | `view`, `create`, `edit`, `delete`, `archive` | Gestión de contratos |
 | `legal` | `view`, `create`, `edit`, `delete` | Documentos legales |
@@ -92,6 +97,8 @@
 | `news` | `view`, `create`, `edit`, `delete` | Novedades del sistema |
 | `dashboard` | `view` | Acceso al dashboard |
 | `reports` | `view`, `create`, `export` | Reportes y exportaciones |
+
+**NOTA:** El módulo `employees` fue removido del sistema. Todos los permisos relacionados con empleados han sido eliminados.
 
 ---
 
@@ -109,10 +116,10 @@ SELECT 'tu-user-id', id, 'tu-user-id' FROM permissions WHERE is_active = true;
 
 ### Asignar permisos específicos a un usuario:
 ```sql
--- Dar permiso para ver y crear empleados
+-- Dar permiso para ver y crear empresas
 INSERT INTO user_permissions (user_id, permission_id, granted_by) VALUES
-('usuario-123', (SELECT id FROM permissions WHERE table_name='employees' AND action='view'), 'admin-456'),
-('usuario-123', (SELECT id FROM permissions WHERE table_name='employees' AND action='create'), 'admin-456');
+('usuario-123', (SELECT id FROM permissions WHERE table_name='companies' AND action='view'), 'admin-456'),
+('usuario-123', (SELECT id FROM permissions WHERE table_name='companies' AND action='create'), 'admin-456');
 ```
 
 ### Verificar permisos de un usuario:
@@ -121,7 +128,7 @@ INSERT INTO user_permissions (user_id, permission_id, granted_by) VALUES
 SELECT * FROM my_permissions();
 
 -- Verificar si un usuario tiene un permiso específico
-SELECT has_permission('usuario-123', 'employees', 'view');
+SELECT has_permission('usuario-123', 'companies', 'view');
 ```
 
 ---
@@ -184,5 +191,117 @@ SELECT has_permission('usuario-123', 'employees', 'view');
 
 ---
 
-*Última actualización: 2025-01-14*
-*Sistema de permisos GOOD Talent v1.2 - RLS Corregido y Módulo Empresas*
+## 📋 Tabla de Contratos
+
+### 4. `contracts` – Contratos Laborales
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440001` |
+| `primer_nombre` | TEXT | Primer nombre del empleado | `Juan` |
+| `segundo_nombre` | TEXT | Segundo nombre (opcional) | `Carlos` |
+| `primer_apellido` | TEXT | Primer apellido del empleado | `Pérez` |
+| `segundo_apellido` | TEXT | Segundo apellido (opcional) | `González` |
+| `tipo_identificacion` | TEXT | Tipo de documento (CC, CE, Pasaporte, PEP, Otro) | `CC` |
+| `numero_identificacion` | TEXT | Número de identificación | `1234567890` |
+| `fecha_nacimiento` | DATE | Fecha de nacimiento | `1990-05-15` |
+| `genero` | TEXT | Género (M, F) | `M` |
+| `celular` | TEXT | Número de celular | `+57 300 123 4567` |
+| `email` | TEXT | Correo electrónico | `juan.perez@email.com` |
+| `empresa_interna` | TEXT | Empresa interna (Good, CPS) | `Good` |
+| `empresa_final_id` | UUID (FK) | Empresa cliente final | `company-uuid` |
+| `ciudad_labora` | TEXT | Ciudad donde labora | `Bogotá` |
+| `cargo` | TEXT | Cargo del empleado | `Desarrollador` |
+| `numero_contrato_helisa` | TEXT | Número de contrato único en Helisa | `CONT-2025-001` |
+| `base_sena` | BOOLEAN | Aporta al SENA | `true` |
+| `fecha_ingreso` | DATE | Fecha de ingreso | `2025-01-15` |
+| `tipo_contrato` | TEXT | Tipo (Indefinido, Fijo, Obra, Aprendizaje) | `Indefinido` |
+| `fecha_fin` | DATE | Fecha de terminación | `2025-12-31` |
+| `tipo_salario` | TEXT | Tipo (Integral, Ordinario) | `Ordinario` |
+| `salario` | NUMERIC(14,2) | Salario base | `3500000.00` |
+| `auxilio_salarial` | NUMERIC(14,2) | Auxilio salarial | `150000.00` |
+| `auxilio_salarial_concepto` | TEXT | Concepto del auxilio salarial | `Transporte` |
+| `auxilio_no_salarial` | NUMERIC(14,2) | Auxilio no salarial | `100000.00` |
+| `auxilio_no_salarial_concepto` | TEXT | Concepto del auxilio no salarial | `Alimentación` |
+| `beneficiario_hijo` | INTEGER | Número de hijos beneficiarios | `2` |
+| `beneficiario_madre` | INTEGER | Madre beneficiaria (0/1) | `1` |
+| `beneficiario_padre` | INTEGER | Padre beneficiario (0/1) | `0` |
+| `beneficiario_conyuge` | INTEGER | Cónyuge beneficiario (0/1) | `1` |
+| `fecha_solicitud` | DATE | Fecha de solicitud | `2025-01-10` |
+| `fecha_radicado` | DATE | Fecha de radicado | `2025-01-12` |
+| `programacion_cita_examenes` | BOOLEAN | Programación de exámenes | `true` |
+| `examenes` | BOOLEAN | Exámenes realizados | `false` |
+| `solicitud_inscripcion_arl` | BOOLEAN | Solicitud inscripción ARL | `true` |
+| `inscripcion_arl` | BOOLEAN | Inscripción ARL confirmada | `false` |
+| `envio_contrato` | BOOLEAN | Contrato enviado | `true` |
+| `recibido_contrato_firmado` | BOOLEAN | Contrato firmado recibido | `false` |
+| `solicitud_eps` | BOOLEAN | Solicitud EPS | `true` |
+| `confirmacion_eps` | BOOLEAN | EPS confirmada | `false` |
+| `envio_inscripcion_caja` | BOOLEAN | Envío a caja | `false` |
+| `confirmacion_inscripcion_caja` | BOOLEAN | Caja confirmada | `false` |
+| `dropbox` | TEXT | URL de soporte en Dropbox | `https://dropbox.com/folder/contract-001` |
+| `radicado_eps` | BOOLEAN | Radicado EPS | `false` |
+| `radicado_ccf` | BOOLEAN | Radicado CCF | `false` |
+| `observacion` | TEXT | Observaciones adicionales | `Pendiente documentos` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+
+**Relaciones:**
+- `empresa_final_id` → `companies(id)`
+- `created_by` → `auth.users(id)`
+- `updated_by` → `auth.users(id)`
+
+**Restricciones:**
+- `UNIQUE(numero_contrato_helisa)` - Número de contrato único
+- Validación de email y URL de Dropbox
+- Lógica de fecha_fin: obligatoria excepto para contratos indefinidos
+- Beneficiarios: madre, padre, cónyuge solo pueden ser 0 o 1
+
+**Índices:**
+- `idx_contracts_numero_contrato_helisa` - Búsqueda por número de contrato
+- `idx_contracts_numero_identificacion` - Búsqueda por identificación
+- `idx_contracts_empresa_final_id` - Filtro por empresa
+- `idx_contracts_nombres` - Búsqueda por nombres
+- `idx_contracts_fecha_ingreso` - Filtro por fecha de ingreso
+
+**Seguridad RLS:**
+- **Ver:** Usuarios con permiso `contracts.view`
+- **Crear:** Usuarios con permiso `contracts.create`
+- **Editar:** Usuarios con permiso `contracts.edit`
+- **Eliminar:** Usuarios con permiso `contracts.delete`
+
+**Computed Columns:**
+- `contracts_created_by_handle(contract)` - Handle del creador
+- `contracts_updated_by_handle(contract)` - Handle del editor
+- `contracts_full_name(contract)` - Nombre completo del empleado
+- `contracts_onboarding_progress(contract)` - Progreso de onboarding (0-100)
+
+**Triggers:**
+- `trigger_contracts_updated_at` - Actualiza automáticamente `updated_at` y `updated_by`
+
+---
+
+## 📋 MIGRACIÓN CONSOLIDADA
+
+La migración consolidada `00000000000000_initial_schema_consolidated.sql` contiene:
+
+✅ **Estado completo del sistema (v2.0)**
+- Todas las tablas: `permissions`, `user_permissions`, `companies`
+- Todas las funciones helper con SECURITY DEFINER
+- Políticas RLS completas y optimizadas
+- Permisos iniciales (sin módulo employees)
+- Computed columns para handles de usuario
+- Índices optimizados para rendimiento
+- Triggers de auditoría automática
+
+✅ **Listo para producción**
+- Idempotente: ejecutable múltiples veces sin problemas
+- Comentado completamente
+- Verificaciones incluidas
+- GRANTs configurados correctamente
+
+---
+
+*Sistema de permisos GOOD Talent v2.0 - Migración Consolidada*

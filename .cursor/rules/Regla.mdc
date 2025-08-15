@@ -198,8 +198,61 @@ Ask:
 
 ---
 
- 11. Language and Localization
-The application’s default and only supported language is Spanish. All user-facing text, notifications, alerts, emails, and UI elements must be written in Spanish. No English or other languages should be used in the interface or communications, unless explicitly approved for a specific exception.
+✅ 11. Permissions & Data Loading Pattern
+
+**MANDATORY for all pages that show Supabase data:**
+
+Always use `usePermissions()` hook - NEVER create custom permission hooks.
+
+Use this exact pattern for data loading with cache:
+
+```typescript
+const [data, setData] = useState<DataType[]>([])
+const [loading, setLoading] = useState(true)
+const [loadingRef, setLoadingRef] = useState(false) // Prevent multiple loads
+const [dataLoaded, setDataLoaded] = useState(false) // Track cache
+
+const loadData = async () => {
+  if (loadingRef) return
+  
+  // Check cache first
+  const cached = localStorage.getItem('TABLENAME_cache')
+  if (cached && !dataLoaded) {
+    const parsed = JSON.parse(cached)
+    if (Date.now() - parsed.timestamp < 300000) { // 5min cache
+      setData(parsed.data)
+      setDataLoaded(true)
+      setLoading(false)
+      return
+    }
+    localStorage.removeItem('TABLENAME_cache')
+  }
+  
+  setLoadingRef(true)
+  // ... load from Supabase
+  // Save to cache: localStorage.setItem('TABLENAME_cache', JSON.stringify({data, timestamp: Date.now()}))
+  setDataLoaded(true)
+  setLoadingRef(false)
+}
+
+useEffect(() => {
+  const shouldLoad = !permissionsLoading && permissions.length > 0 && canRead && !dataLoaded && !loadingRef
+  if (shouldLoad) loadData()
+  else if (dataLoaded) setLoading(false)
+}, [permissionsLoading, permissions.length, canRead, dataLoaded])
+```
+
+**Cache naming:** `TABLENAME_cache` (companies_cache, users_cache, etc.)
+
+**NEVER:**
+- Call `supabase.rpc('my_permissions')` directly
+- Load data without checking cache first
+- Use `data.length === 0` as load condition (use `dataLoaded` instead)
+
+---
+
+✅ 12. Language and Localization
+The application's default and only supported language is Spanish. All user-facing text, notifications, alerts, emails, and UI elements must be written in Spanish. No English or other languages should be used in the interface or communications, unless explicitly approved for a specific exception.
 
 ---
 

@@ -35,14 +35,10 @@ export default function Sidebar() {
       href: '/dashboard/empresas',
       icon: Building2
     },
+
     {
-      name: 'Empleados',
-      href: '/dashboard/empleados',
-      icon: Users
-    },
-    {
-      name: 'Contratación',
-      href: '/dashboard/contratacion',
+      name: 'Contratos',
+      href: '/dashboard/contratos',
       icon: FileText
     },
     {

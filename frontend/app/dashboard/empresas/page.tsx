@@ -34,6 +34,8 @@ type FilterStatus = 'all' | 'active' | 'inactive' | 'archived'
 export default function EmpresasPage() {
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingRef, setLoadingRef] = useState(false) // Prevent multiple simultaneous loads
+  const [dataLoaded, setDataLoaded] = useState(false) // Track if data was loaded before
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [showModal, setShowModal] = useState(false)
@@ -43,9 +45,9 @@ export default function EmpresasPage() {
   const [toastMsg, setToastMsg] = useState('')
   const [toastType, setToastType] = useState<'success'|'error'|'info'>('success')
 
-  const { hasPermission, loading: permissionsLoading } = usePermissions()
+  const { hasPermission, loading: permissionsLoading, permissions } = usePermissions()
   
-  // Verificar permisos
+  // Verificar permisos (reactivos - se recalculan cuando los permisos cambian)
   const canRead = hasPermission('companies', 'view')
   const canCreate = hasPermission('companies', 'create')
   const canUpdate = hasPermission('companies', 'edit')
@@ -53,37 +55,78 @@ export default function EmpresasPage() {
 
   // Cargar empresas solo cuando los permisos estén listos
   const loadCompanies = async () => {
-    if (permissionsLoading) {
-      return // Esperar a que los permisos carguen
-    }
-    
     if (!canRead) {
       setLoading(false)
       return
     }
 
+    if (loadingRef) {
+      return
+    }
+
+    // Verificar cache primero
+    const cachedData = localStorage.getItem('companies_cache')
+    if (cachedData && !dataLoaded) {
+      try {
+        const parsed = JSON.parse(cachedData)
+        const cacheAge = Date.now() - parsed.timestamp
+        
+        if (cacheAge < 300000) { // 5 minutos
+          setCompanies(parsed.data)
+          setDataLoaded(true)
+          setLoading(false)
+          return
+        } else {
+          localStorage.removeItem('companies_cache')
+        }
+      } catch (e) {
+        localStorage.removeItem('companies_cache')
+      }
+    }
+
     try {
+      setLoadingRef(true)
+      
       const { data, error } = await supabase
         .from('companies')
         .select('*, companies_created_by_handle, companies_updated_by_handle')
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Error loading companies:', error)
+        throw error
+      }
 
-      setCompanies(data || [])
+      const companiesData = data || []
+      
+      // Guardar en cache
+      localStorage.setItem('companies_cache', JSON.stringify({
+        data: companiesData,
+        timestamp: Date.now()
+      }))
+      
+      setCompanies(companiesData)
+      setDataLoaded(true)
     } catch (error) {
       console.error('Error loading companies:', error)
     } finally {
       setLoading(false)
+      setLoadingRef(false)
     }
   }
 
   useEffect(() => {
-    // Solo cargar empresas cuando los permisos estén completamente cargados
-    if (!permissionsLoading) {
+    // SOLO cargar si realmente hay cambios significativos
+    const shouldLoad = !permissionsLoading && permissions.length > 0 && canRead && !dataLoaded && !loadingRef
+    
+    if (shouldLoad) {
       loadCompanies()
+    } else if (!permissionsLoading && permissions.length === 0) {
+      setLoading(false)
+    } else if (dataLoaded) {
+      setLoading(false)
     }
-  }, [canRead, permissionsLoading])
+  }, [permissionsLoading, permissions.length, canRead, dataLoaded]) // Reactivo a cambios de permisos
 
   // Filtrar empresas
   const filteredCompanies = companies.filter(company => {

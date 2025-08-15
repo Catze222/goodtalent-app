@@ -32,13 +32,13 @@ export default function BottomNavigation() {
       icon: Building2
     },
     {
-      name: 'Personal',
-      href: '/dashboard/empleados',
-      icon: Users
+      name: 'Novedades',
+      href: '/dashboard/novedades',
+      icon: Bell
     },
     {
       name: 'Contratos',
-      href: '/dashboard/contratacion',
+      href: '/dashboard/contratos',
       icon: FileText
     },
     {
@@ -106,13 +106,6 @@ export default function BottomNavigation() {
           
           {/* Dropdown menu para módulos adicionales */}
           <div className="absolute bottom-full mb-2 right-0 bg-white rounded-xl shadow-lg border border-gray-200 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-            <Link
-              href="/dashboard/novedades"
-              className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-100 transition-colors whitespace-nowrap"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="text-sm font-medium">Novedades</span>
-            </Link>
             <Link
               href="/dashboard/legal"
               className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-100 transition-colors whitespace-nowrap"

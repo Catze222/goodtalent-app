@@ -28,6 +28,14 @@ interface SelectedPermissions {
   [key: string]: string[] // table_name -> actions[]
 }
 
+interface AvailablePermission {
+  id: string
+  table_name: string
+  action: string
+  description: string
+  is_active: boolean
+}
+
 export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUserModalProps) {
   const [email, setEmail] = useState('')
   const [selectedPermissions, setSelectedPermissions] = useState<SelectedPermissions>({})
@@ -95,6 +103,39 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
 
   const getSelectedPermissionsCount = () => {
     return Object.values(selectedPermissions).reduce((total, actions) => total + actions.length, 0)
+  }
+
+  const getAllAvailablePermissions = () => {
+    const allPermissions: { [key: string]: string[] } = {}
+    Object.entries(groupedPermissions).forEach(([tableName, permissions]) => {
+      allPermissions[tableName] = (permissions as AvailablePermission[]).map(p => p.action)
+    })
+    return allPermissions
+  }
+
+  const getTotalAvailablePermissionsCount = () => {
+    return Object.values(groupedPermissions).reduce((total: number, permissions) => total + (permissions as AvailablePermission[]).length, 0)
+  }
+
+  const hasAllPermissions = () => {
+    const allPermissions = getAllAvailablePermissions()
+    return Object.entries(allPermissions).every(([tableName, actions]) => {
+      const selectedActions = selectedPermissions[tableName] || []
+      return actions.every(action => selectedActions.includes(action))
+    })
+  }
+
+  const toggleAllPermissions = () => {
+    const allPermissions = getAllAvailablePermissions()
+    const currentlyHasAll = hasAllPermissions()
+    
+    if (currentlyHasAll) {
+      // Deseleccionar todos
+      setSelectedPermissions({})
+    } else {
+      // Seleccionar todos
+      setSelectedPermissions(allPermissions)
+    }
   }
 
   const handleInviteUser = async () => {
@@ -376,6 +417,38 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
           </div>
         )}
 
+        {/* Global Select All Checkbox */}
+        {!permissionsLoading && Object.keys(groupedPermissions).length > 0 && (
+          <div className="border-2 border-[#5FD3D2] bg-[#87E0E0] bg-opacity-10 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <button
+                  onClick={toggleAllPermissions}
+                  className={`w-5 h-5 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                    hasAllPermissions()
+                      ? 'bg-[#5FD3D2] border-[#5FD3D2] text-white'
+                      : 'border-[#5FD3D2] hover:bg-[#5FD3D2] hover:text-white'
+                  }`}
+                  disabled={loading}
+                >
+                  {hasAllPermissions() && <Check className="w-3 h-3 sm:w-4 sm:h-4" />}
+                </button>
+                <div>
+                  <h4 className="font-semibold text-sm sm:text-base text-[#004C4C]">
+                    Todos los permisos
+                  </h4>
+                  <p className="text-xs text-[#065C5C]">
+                    Seleccionar/deseleccionar todos los permisos disponibles
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs text-[#065C5C] flex-shrink-0 font-medium">
+                {getSelectedPermissionsCount()}/{getTotalAvailablePermissionsCount()} permisos
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Permissions List */}
         <div className="space-y-3 sm:space-y-4">
           {permissionsLoading ? (
@@ -385,7 +458,8 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
             </div>
           ) : (
             Object.entries(groupedPermissions).map(([tableName, permissions]) => {
-              const actions = permissions.map(p => p.action)
+              const typedPermissions = permissions as AvailablePermission[]
+              const actions = typedPermissions.map(p => p.action)
               const selectedActions = selectedPermissions[tableName] || []
               const hasAllPermissions = actions.every(action => selectedActions.includes(action))
               const hasPartialPermissions = selectedActions.length > 0 && !hasAllPermissions
@@ -415,12 +489,12 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
                       </h4>
                     </div>
                     <span className="text-xs text-gray-500 flex-shrink-0">
-                      {selectedActions.length}/{permissions.length} seleccionados
+                      {selectedActions.length}/{typedPermissions.length} seleccionados
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                    {permissions.map((permission) => {
+                    {typedPermissions.map((permission) => {
                       const isSelected = selectedActions.includes(permission.action)
                       
                       return (
@@ -529,23 +603,55 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
             <h4 className="font-medium text-[#004C4C] mb-3">
               Permisos asignados ({getSelectedPermissionsCount()}):
             </h4>
-            <div className="space-y-2">
-              {Object.entries(selectedPermissions).map(([tableName, actions]) => (
-                <div key={tableName} className="flex flex-wrap gap-1">
-                  <span className="text-sm text-gray-600 capitalize font-medium mr-2">
-                    {tableName.replace('_', ' ')}:
-                  </span>
-                  {actions.map((action) => (
-                    <span
-                      key={action}
-                      className="inline-block px-2 py-1 bg-[#87E0E0] bg-opacity-30 text-[#004C4C] text-xs rounded-full"
-                    >
-                      {action}
+            {getSelectedPermissionsCount() === 0 ? (
+              <p className="text-gray-500 text-sm">Sin permisos asignados</p>
+            ) : getSelectedPermissionsCount() > 10 ? (
+              <div className="space-y-2">
+                <p className="text-sm text-[#065C5C] bg-[#87E0E0] bg-opacity-20 p-2 rounded">
+                  Se asignarán {getSelectedPermissionsCount()} permisos en total
+                </p>
+                <details className="cursor-pointer">
+                  <summary className="text-sm text-[#5FD3D2] hover:text-[#004C4C] transition-colors">
+                    Ver todos los permisos
+                  </summary>
+                  <div className="mt-2 max-h-32 overflow-y-auto space-y-2 border border-gray-200 rounded p-2">
+                    {Object.entries(selectedPermissions).map(([tableName, actions]) => (
+                      <div key={tableName} className="flex flex-wrap gap-1">
+                        <span className="text-sm text-gray-600 capitalize font-medium mr-2">
+                          {tableName.replace('_', ' ')}:
+                        </span>
+                        {actions.map((action) => (
+                          <span
+                            key={action}
+                            className="inline-block px-2 py-1 bg-[#87E0E0] bg-opacity-30 text-[#004C4C] text-xs rounded-full"
+                          >
+                            {action}
+                          </span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {Object.entries(selectedPermissions).map(([tableName, actions]) => (
+                  <div key={tableName} className="flex flex-wrap gap-1">
+                    <span className="text-sm text-gray-600 capitalize font-medium mr-2">
+                      {tableName.replace('_', ' ')}:
                     </span>
-                  ))}
-                </div>
-              ))}
-            </div>
+                    {actions.map((action) => (
+                      <span
+                        key={action}
+                        className="inline-block px-2 py-1 bg-[#87E0E0] bg-opacity-30 text-[#004C4C] text-xs rounded-full"
+                      >
+                        {action}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {error && (
@@ -600,12 +706,15 @@ export default function InviteUserModal({ isOpen, onClose, onSuccess }: InviteUs
     if (step === 'permissions') {
       return 'w-full max-w-4xl h-[95vh] sm:h-[90vh]' // Grande para permisos
     }
-    return 'w-full max-w-2xl max-h-[80vh] sm:max-h-[75vh]' // Más pequeño para email y confirmación
+    if (step === 'confirm') {
+      return 'w-full max-w-2xl h-[90vh] sm:h-[85vh]' // Altura fija para confirmación para evitar que se extienda
+    }
+    return 'w-full max-w-2xl max-h-[80vh] sm:max-h-[75vh]' // Más pequeño para email
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-2 sm:p-4">
-      <div className={`bg-white rounded-lg sm:rounded-xl shadow-xl flex flex-col ${getModalSize()}`}>
+      <div className={`bg-white rounded-lg sm:rounded-xl shadow-xl flex flex-col overflow-hidden ${getModalSize()}`}>
         {step === 'email' && renderEmailStep()}
         {step === 'permissions' && renderPermissionsStep()}
         {step === 'confirm' && renderConfirmStep()}

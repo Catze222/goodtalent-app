@@ -1,17 +1,18 @@
 /**
  * Root layout for GOOD Talent application
- * Provides global styles and metadata configuration
+ * Provides global styles, metadata configuration and permissions context
  */
 
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { PermissionsProvider } from '../lib/PermissionsProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'GOOD Talent - Inicio de Sesión',
-  description: 'Plataforma de gestión de talento - Inicia sesión en tu cuenta',
+  title: 'GOOD Talent - Portal Corporativo',
+  description: 'Sistema integral de gestión de recursos humanos y servicios legales',
 }
 
 export default function RootLayout({
@@ -21,7 +22,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <PermissionsProvider>
+          {children}
+        </PermissionsProvider>
+      </body>
     </html>
   )
 }

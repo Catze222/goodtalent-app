@@ -14,18 +14,14 @@ import {
   Settings
 } from 'lucide-react'
 
-interface HeaderProps {
-  user: User
-}
-
 /**
  * Header principal del dashboard con usuario, notificaciones y búsqueda
  */
-export default function Header({ user }: HeaderProps) {
+export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
-  const { canManageUsers } = usePermissions()
+  const { user, canManageUsers, logout } = usePermissions()
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
@@ -48,31 +44,16 @@ export default function Header({ user }: HeaderProps) {
     try {
       setShowUserMenu(false) // Cerrar menú inmediatamente
       
-      // Limpiar estado local de permisos
-      const { forceRefresh } = usePermissions()
-      if (forceRefresh) {
-        forceRefresh()
-      }
+      // Usar la función de logout del contexto
+      await logout()
       
-      // Cerrar sesión en Supabase
-      const { error } = await supabase.auth.signOut()
-      
-      if (error) {
-        console.error('Error signing out:', error)
-        return
-      }
-      
-      // Limpiar localStorage/sessionStorage si es necesario
-      localStorage.clear()
-      sessionStorage.clear()
-      
-      // Redirigir
+      // Redirigir después del logout
       router.push('/')
-      router.refresh() // Forzar refresh de la página
+      router.refresh()
       
     } catch (error) {
       console.error('Error during logout:', error)
-      // Fallback: forzar redirect incluso si hay error
+      // Fallback: forzar redirect
       window.location.href = '/'
     }
   }
