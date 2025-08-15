@@ -7,5 +7,6 @@ export {
   usePermissions,
   useAvailablePermissions,
   PermissionsProvider,
-  type UserPermission
+  type UserPermission,
+  type AvailablePermission
 } from './PermissionsProvider'
