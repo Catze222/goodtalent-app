@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useAvailablePermissions } from '@/lib/usePermissions'
+import { useAvailablePermissions, type AvailablePermission } from '@/lib/usePermissions'
 import { 
   X, 
   Shield, 
@@ -97,13 +97,13 @@ export default function EditUserPermissionsModal({
 
   const isPermissionActive = (tableName: string, action: string): boolean => {
     // Check if there's a pending change for this permission
-    const change = changes.find(c => c.table_name === tableName && c.action === action)
+    const change = changes.find((c: PermissionChange) => c.table_name === tableName && c.action === action)
     if (change) {
       return change.will_be_active
     }
 
     // Check current state
-    const permission = userPermissions.find(p => p.table_name === tableName && p.action === action)
+    const permission = userPermissions.find((p: UserPermission) => p.table_name === tableName && p.action === action)
     return permission?.is_active || false
   }
 
@@ -134,24 +134,24 @@ export default function EditUserPermissionsModal({
 
   const getPermissionId = (tableName: string, action: string): string => {
     // First check user permissions
-    const userPermission = userPermissions.find(p => p.table_name === tableName && p.action === action)
+    const userPermission = userPermissions.find((p: UserPermission) => p.table_name === tableName && p.action === action)
     if (userPermission) {
       return userPermission.permission_id
     }
 
     // Then check available permissions
     const permissions = groupedPermissions[tableName] || []
-    const permission = permissions.find(p => p.action === action)
+    const permission = permissions.find((p: AvailablePermission) => p.action === action)
     return permission?.id || ''
   }
 
-  const toggleAllModulePermissions = (tableName: string, permissions: any[]) => {
-    const activeCount = permissions.filter(p => isPermissionActive(tableName, p.action)).length
+  const toggleAllModulePermissions = (tableName: string, permissions: AvailablePermission[]) => {
+    const activeCount = permissions.filter((p: AvailablePermission) => isPermissionActive(tableName, p.action)).length
     const shouldActivateAll = activeCount < permissions.length
 
-    permissions.forEach(permission => {
+    permissions.forEach((permission: AvailablePermission) => {
       const currentlyActive = isPermissionActive(tableName, permission.action)
-      const originalPermission = userPermissions.find(p => p.table_name === tableName && p.action === permission.action)
+      const originalPermission = userPermissions.find((p: UserPermission) => p.table_name === tableName && p.action === permission.action)
       const wasOriginallyActive = originalPermission?.is_active || false
 
       // Si shouldActivateAll es true, activar todos
@@ -294,7 +294,7 @@ export default function EditUserPermissionsModal({
               </div>
             ) : (
               Object.entries(groupedPermissions).map(([tableName, permissions]) => {
-                const activeCount = permissions.filter(p => isPermissionActive(tableName, p.action)).length
+                const activeCount = permissions.filter((p: AvailablePermission) => isPermissionActive(tableName, p.action)).length
                 
                 return (
                   <div key={tableName} className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white">
@@ -326,9 +326,9 @@ export default function EditUserPermissionsModal({
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                      {permissions.map((permission) => {
+                      {permissions.map((permission: AvailablePermission) => {
                         const isActive = isPermissionActive(tableName, permission.action)
-                        const hasChange = changes.some(c => c.table_name === tableName && c.action === permission.action)
+                        const hasChange = changes.some((c: PermissionChange) => c.table_name === tableName && c.action === permission.action)
                         const permissionId = getPermissionId(tableName, permission.action)
                         
                         return (

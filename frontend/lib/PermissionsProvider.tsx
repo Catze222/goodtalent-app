@@ -16,6 +16,14 @@ export interface UserPermission {
   granted_at: string
 }
 
+export interface AvailablePermission {
+  id: string
+  table_name: string
+  action: string
+  description: string
+  is_active: boolean
+}
+
 interface PermissionsContextType {
   // Estado del usuario y permisos
   user: User | null
@@ -309,7 +317,7 @@ export function usePermissions(): PermissionsContextType {
 
 // Hook para obtener permisos disponibles (mantener separado)
 export function useAvailablePermissions() {
-  const [permissions, setPermissions] = useState<any[]>([])
+  const [permissions, setPermissions] = useState<AvailablePermission[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -345,7 +353,7 @@ export function useAvailablePermissions() {
     }
     acc[permission.table_name].push(permission)
     return acc
-  }, {} as Record<string, any[]>)
+  }, {} as Record<string, AvailablePermission[]>)
 
   return {
     permissions,
