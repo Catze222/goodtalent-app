@@ -73,7 +73,7 @@ export default function ContratosPage() {
     }
 
     // Verificar cache primero
-    const cachedData = localStorage.getItem('contracts_cache_v2')
+    const cachedData = localStorage.getItem('contracts_cache_v3') // Cambié a v3 para forzar recarga
     if (cachedData && !dataLoaded) {
       try {
         const parsed = JSON.parse(cachedData)
@@ -85,10 +85,10 @@ export default function ContratosPage() {
           setLoading(false)
           return
         } else {
-          localStorage.removeItem('contracts_cache_v2')
+          localStorage.removeItem('contracts_cache_v3')
         }
       } catch (e) {
-        localStorage.removeItem('contracts_cache_v2')
+        localStorage.removeItem('contracts_cache_v3')
       }
     }
 
@@ -172,13 +172,20 @@ export default function ContratosPage() {
         }
       })
       
+      // Ordenar alfabéticamente por nombre de empresa cliente
+      const sortedContractsData = enrichedContractsData.sort((a, b) => {
+        const companyA = a.company?.name || 'Sin empresa'
+        const companyB = b.company?.name || 'Sin empresa'
+        return companyA.localeCompare(companyB, 'es', { sensitivity: 'base' })
+      })
+      
       // Guardar en cache
-      localStorage.setItem('contracts_cache_v2', JSON.stringify({
-        data: enrichedContractsData,
+      localStorage.setItem('contracts_cache_v3', JSON.stringify({
+        data: sortedContractsData,
         timestamp: Date.now()
       }))
       
-      setContracts(enrichedContractsData)
+      setContracts(sortedContractsData)
       setDataLoaded(true)
     } catch (error) {
       console.error('Error loading contracts:', error)
@@ -191,6 +198,7 @@ export default function ContratosPage() {
   useEffect(() => {
     // Limpiar cache viejo en caso de que exista
     localStorage.removeItem('contracts_cache')
+    localStorage.removeItem('contracts_cache_v3') // Limpiar cache anterior
     
     const shouldLoad = !permissionsLoading && permissions.length > 0 && canRead && !dataLoaded && !loadingRef
     
@@ -211,7 +219,7 @@ export default function ContratosPage() {
     const matchesSearch = searchTerm === '' || 
       fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contract.numero_identificacion.includes(searchTerm) ||
-      contract.numero_contrato_helisa.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (contract.numero_contrato_helisa || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (contract.company?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (contract.cargo || '').toLowerCase().includes(searchTerm.toLowerCase())
 
@@ -320,7 +328,7 @@ export default function ContratosPage() {
     setToastMsg(modalMode === 'create' ? 'Contrato creado exitosamente' : 'Contrato actualizado exitosamente')
     setToastOpen(true)
     // Invalidar cache y recargar
-    localStorage.removeItem('contracts_cache_v2')
+    localStorage.removeItem('contracts_cache_v3')
     setDataLoaded(false)
     loadContracts()
   }
@@ -429,7 +437,7 @@ export default function ContratosPage() {
           contracts={filteredContracts}
           onEdit={handleEdit}
           onUpdate={() => {
-            localStorage.removeItem('contracts_cache_v2')
+            localStorage.removeItem('contracts_cache_v3')
             setDataLoaded(false)
             loadContracts()
           }}
@@ -437,7 +445,7 @@ export default function ContratosPage() {
           canDelete={canDelete}
           onApprove={(contract) => {
             // El componente maneja la aprobación internamente
-            localStorage.removeItem('contracts_cache_v2')
+            localStorage.removeItem('contracts_cache_v3')
             setDataLoaded(false)
             loadContracts()
           }}

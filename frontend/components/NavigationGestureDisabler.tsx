@@ -26,7 +26,7 @@ export default function NavigationGestureDisabler({ children }: { children: Reac
       const hasHorizontalScroll = element.scrollWidth > element.clientWidth
       
       // Verificar también clases de Tailwind y atributos especiales
-      const className = element.className || ''
+      const className = typeof element.className === 'string' ? element.className : element.className.toString()
       const hasScrollClass = className.includes('overflow-x-auto') || 
                             className.includes('overflow-x-scroll') || 
                             className.includes('horizontal-scroll') ||

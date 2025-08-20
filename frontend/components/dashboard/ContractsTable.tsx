@@ -194,9 +194,6 @@ export default function ContractsTable({
     return 'bg-red-400'
   }
 
-  // Debug: Log para verificar sticky
-  console.log('ContractsTable rendered - Debug sticky')
-  
   const onboardingFields = [
     { key: 'programacion_cita_examenes' as OnboardingField, label: 'Prog Cita' },
     { key: 'examenes' as OnboardingField, label: 'Exámenes' },
@@ -216,21 +213,11 @@ export default function ContractsTable({
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       
       {/* Tabla con scroll unificado */}
-      <div className="hidden lg:block overflow-y-auto max-h-screen">
-        <div className="overflow-x-auto">
-          <div style={{ minWidth: `${calculateMinWidth()}px` }}>
-            
-            {/* Header de tabla */}
-            <div 
-              className="grid gap-2 p-4 bg-red-100 border-b border-gray-200 font-medium text-gray-700 text-sm sticky top-0 z-10" 
-              style={{
-                gridTemplateColumns: generateGridColumns(),
-                backgroundColor: 'red', // Debug color
-                position: 'sticky',
-                top: '0px',
-                zIndex: '50'
-              }}
-            >
+      <div className="hidden lg:block overflow-x-auto">
+        <div style={{ minWidth: `${calculateMinWidth()}px` }}>
+          
+          {/* Header de tabla */}
+          <div className="grid gap-2 p-4 bg-gray-50 border-b border-gray-200 font-medium text-gray-700 text-sm" style={{gridTemplateColumns: generateGridColumns()}}>
             
             {/* Acciones al principio */}
             <div>Acciones</div>
@@ -253,9 +240,9 @@ export default function ContractsTable({
             <div>Progreso</div>
           </div>
 
-            {/* Filas de la tabla dentro del mismo contenedor */}
-            <div className="divide-y divide-gray-100">
-              {contracts.map((contract) => {
+          {/* Filas de la tabla dentro del mismo contenedor */}
+          <div className="divide-y divide-gray-100">
+            {contracts.map((contract) => {
               const isExpanded = expandedRows.has(contract.id)
               const progress = contract.contracts_onboarding_progress || 0
               const fullName = contract.contracts_full_name || 
@@ -573,8 +560,7 @@ export default function ContractsTable({
 
                 </div>
               )
-              })}
-            </div>
+            })}
           </div>
         </div>
       </div>
