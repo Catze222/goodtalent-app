@@ -243,6 +243,9 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 | `radicado_eps` | BOOLEAN | Radicado EPS | `false` |
 | `radicado_ccf` | BOOLEAN | Radicado CCF | `false` |
 | `observacion` | TEXT | Observaciones adicionales | `Pendiente documentos` |
+| `status_aprobacion` | TEXT | Estado de aprobación (borrador, aprobado) | `borrador` |
+| `approved_at` | TIMESTAMPTZ | Fecha de aprobación | `2025-01-15 16:30:00` |
+| `approved_by` | UUID (FK) | Usuario que aprobó el contrato | `user-uuid` |
 | `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
 | `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
 | `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
@@ -252,12 +255,15 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 - `empresa_final_id` → `companies(id)`
 - `created_by` → `auth.users(id)`
 - `updated_by` → `auth.users(id)`
+- `approved_by` → `auth.users(id)`
 
 **Restricciones:**
 - `UNIQUE(numero_contrato_helisa)` - Número de contrato único
 - Validación de email y URL de Dropbox
 - Lógica de fecha_fin: obligatoria excepto para contratos indefinidos
 - Beneficiarios: madre, padre, cónyuge solo pueden ser 0 o 1
+- Estado de aprobación: solo puede ser 'borrador' o 'aprobado'
+- Lógica de aprobación: una vez aprobado no se puede editar ni eliminar
 
 **Índices:**
 - `idx_contracts_numero_contrato_helisa` - Búsqueda por número de contrato
@@ -277,6 +283,11 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 - `contracts_updated_by_handle(contract)` - Handle del editor
 - `contracts_full_name(contract)` - Nombre completo del empleado
 - `contracts_onboarding_progress(contract)` - Progreso de onboarding (0-100)
+- `get_contract_full_status(contract)` - Estado completo con flags de permisos
+
+**Funciones del Sistema de Estados:**
+- `calculate_contract_status_vigencia(fecha_fin)` - Calcula si está activo/terminado
+- `approve_contract(contract_id, user_id)` - Función segura para aprobar contratos
 
 **Triggers:**
 - `trigger_contracts_updated_at` - Actualiza automáticamente `updated_at` y `updated_by`

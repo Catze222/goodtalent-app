@@ -8,73 +8,11 @@ import ContractModal from '../../../components/dashboard/ContractModal'
 import ContractsTable from '../../../components/dashboard/ContractsTable'
 import ContractsFilters, { FilterEmpresa, FilterOnboarding } from '../../../components/dashboard/ContractsFilters'
 import Toast from '../../../components/dashboard/Toast'
+import { Contract, Company } from '../../../types/contract'
 
-interface Contract {
-  id: string
-  primer_nombre: string
-  segundo_nombre?: string | null
-  primer_apellido: string
-  segundo_apellido?: string | null
-  tipo_identificacion: string
-  numero_identificacion: string
-  fecha_nacimiento: string
-  genero: string
-  celular?: string | null
-  email?: string | null
-  empresa_interna: string
-  empresa_final_id: string
-  ciudad_labora?: string | null
-  cargo?: string | null
-  numero_contrato_helisa: string
-  base_sena: boolean
-  fecha_ingreso?: string | null
-  tipo_contrato?: string | null
-  fecha_fin?: string | null
-  tipo_salario?: string | null
-  salario?: number | null
-  auxilio_salarial?: number | null
-  auxilio_salarial_concepto?: string | null
-  auxilio_no_salarial?: number | null
-  auxilio_no_salarial_concepto?: string | null
-  beneficiario_hijo: number
-  beneficiario_madre: number
-  beneficiario_padre: number
-  beneficiario_conyuge: number
-  fecha_solicitud?: string | null
-  fecha_radicado?: string | null
-  programacion_cita_examenes: boolean
-  examenes: boolean
-  solicitud_inscripcion_arl: boolean
-  inscripcion_arl: boolean
-  envio_contrato: boolean
-  recibido_contrato_firmado: boolean
-  solicitud_eps: boolean
-  confirmacion_eps: boolean
-  envio_inscripcion_caja: boolean
-  confirmacion_inscripcion_caja: boolean
-  dropbox?: string | null
-  radicado_eps: boolean
-  radicado_ccf: boolean
-  observacion?: string | null
-  created_at: string
-  updated_at: string
-  created_by: string
-  updated_by: string
-  contracts_created_by_handle?: string | null
-  contracts_updated_by_handle?: string | null
-  contracts_full_name?: string | null
-  contracts_onboarding_progress?: number | null
-  company?: {
-    name: string
-    tax_id: string
-  }
-}
 
-interface Company {
-  id: string
-  name: string
-  tax_id: string
-}
+
+
 
 
 
@@ -357,6 +295,13 @@ export default function ContratosPage() {
     setShowModal(true)
   }
 
+  // Manejar reporte de novedad
+  const handleReportNovelty = (contract: Contract) => {
+    // Por ahora solo mostrar un toast - aquí se puede integrar con el módulo de novedades futuro
+    showToast(`Iniciando reporte de novedad para ${contract.primer_nombre} ${contract.primer_apellido}`, 'info')
+    console.log('Reportar novedad para contrato:', contract)
+  }
+
   const handleEdit = (contract: Contract) => {
     if (!canUpdate) return
     setEditingContract(contract)
@@ -490,6 +435,13 @@ export default function ContratosPage() {
           }}
           canUpdate={canUpdate}
           canDelete={canDelete}
+          onApprove={(contract) => {
+            // El componente maneja la aprobación internamente
+            localStorage.removeItem('contracts_cache_v2')
+            setDataLoaded(false)
+            loadContracts()
+          }}
+          onReportNovelty={handleReportNovelty}
         />
       )}
 

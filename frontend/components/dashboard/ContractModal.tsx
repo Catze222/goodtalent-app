@@ -1,57 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, User, FileText, CheckSquare, ChevronRight } from 'lucide-react'
+import { X, User, FileText, CheckSquare, ChevronRight, Shield, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
+import { Contract, getContractStatusConfig } from '../../types/contract'
 
-interface Contract {
-  id?: string
-  primer_nombre: string
-  segundo_nombre?: string | null
-  primer_apellido: string
-  segundo_apellido?: string | null
-  tipo_identificacion: string
-  numero_identificacion: string
-  fecha_nacimiento: string
-  genero: string
-  celular?: string | null
-  email?: string | null
-  empresa_interna: string
-  empresa_final_id: string
-  ciudad_labora?: string | null
-  cargo?: string | null
-  numero_contrato_helisa: string
-  base_sena: boolean
-  fecha_ingreso?: string | null
-  tipo_contrato?: string | null
-  fecha_fin?: string | null
-  tipo_salario?: string | null
-  salario?: number | null
-  auxilio_salarial?: number | null
-  auxilio_salarial_concepto?: string | null
-  auxilio_no_salarial?: number | null
-  auxilio_no_salarial_concepto?: string | null
-  beneficiario_hijo: number
-  beneficiario_madre: number
-  beneficiario_padre: number
-  beneficiario_conyuge: number
-  fecha_solicitud?: string | null
-  fecha_radicado?: string | null
-  programacion_cita_examenes: boolean
-  examenes: boolean
-  solicitud_inscripcion_arl: boolean
-  inscripcion_arl: boolean
-  envio_contrato: boolean
-  recibido_contrato_firmado: boolean
-  solicitud_eps: boolean
-  confirmacion_eps: boolean
-  envio_inscripcion_caja: boolean
-  confirmacion_inscripcion_caja: boolean
-  dropbox?: string | null
-  radicado_eps: boolean
-  radicado_ccf: boolean
-  observacion?: string | null
-}
+
 
 interface Company {
   id: string
@@ -81,6 +35,11 @@ export default function ContractModal({
   companies
 }: ContractModalProps) {
   const [currentTab, setCurrentTab] = useState(0)
+  
+  // Lógica de estados del contrato
+  const statusConfig = contract ? getContractStatusConfig(contract) : null
+  const isReadOnly = contract && !statusConfig?.can_edit
+  
   const [formData, setFormData] = useState<Contract>({
     primer_nombre: '',
     segundo_nombre: '',
@@ -96,7 +55,6 @@ export default function ContractModal({
     empresa_final_id: '',
     ciudad_labora: '',
     cargo: '',
-    numero_contrato_helisa: '',
     base_sena: false,
     fecha_ingreso: '',
     tipo_contrato: 'Indefinido',
@@ -126,11 +84,44 @@ export default function ContractModal({
     dropbox: '',
     radicado_eps: false,
     radicado_ccf: false,
-    observacion: ''
+    observacion: '',
+    status_aprobacion: 'borrador'
   })
 
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Helper para props de inputs con lógica de solo lectura
+  const getInputProps = (fieldName: string, hasError: boolean = false) => ({
+    readOnly: isReadOnly,
+    disabled: isReadOnly,
+    tabIndex: isReadOnly ? -1 : 0,
+    className: `w-full px-4 py-3 border rounded-xl transition-all ${
+      isReadOnly 
+        ? 'bg-gray-100 text-gray-700 cursor-not-allowed border-gray-300 select-none pointer-events-none' 
+        : `focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent ${
+            hasError ? 'border-red-300' : 'border-gray-300'
+          }`
+    }`
+  })
+
+  // Helper para checkboxes
+  const getCheckboxProps = () => ({
+    disabled: isReadOnly,
+    className: `${isReadOnly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} w-5 h-5 text-[#004C4C] rounded focus:ring-[#87E0E0] border-gray-300`
+  })
+
+  // Formatear número con puntos como separadores de miles
+  const formatNumberWithDots = (value: number | string) => {
+    if (!value) return ''
+    const numStr = value.toString().replace(/\./g, '') // Remover puntos existentes
+    return numStr.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  }
+
+  // Convertir string con puntos a número
+  const parseNumberFromDots = (value: string) => {
+    return parseFloat(value.replace(/\./g, '')) || 0
+  }
 
   // Tabs configuration
   const tabs = [
@@ -169,7 +160,6 @@ export default function ContractModal({
           empresa_final_id: contract.empresa_final_id || '',
           ciudad_labora: contract.ciudad_labora || '',
           cargo: contract.cargo || '',
-          numero_contrato_helisa: contract.numero_contrato_helisa || '',
           base_sena: contract.base_sena || false,
           fecha_ingreso: contract.fecha_ingreso || '',
           tipo_contrato: contract.tipo_contrato || 'Indefinido',
@@ -218,7 +208,6 @@ export default function ContractModal({
           empresa_final_id: companies.length > 0 ? companies[0].id : '',
           ciudad_labora: '',
           cargo: '',
-          numero_contrato_helisa: '',
           base_sena: false,
           fecha_ingreso: '',
           tipo_contrato: 'Indefinido',
@@ -256,32 +245,72 @@ export default function ContractModal({
     }
   }, [isOpen, contract, mode, companies])
 
-  // Validar pestaña actual
-  const validateCurrentTab = (): boolean => {
+  // Validar todos los campos y obtener errores por pestaña
+  const validateAllFields = (): { errors: Record<string, string>, errorsByTab: Record<number, string[]> } => {
     const newErrors: Record<string, string> = {}
+    const errorsByTab: Record<number, string[]> = { 0: [], 1: [], 2: [] }
 
-    if (currentTab === 0) {
-      // Información Personal
-      if (!formData.primer_nombre.trim()) newErrors.primer_nombre = 'El primer nombre es obligatorio'
-      if (!formData.primer_apellido.trim()) newErrors.primer_apellido = 'El primer apellido es obligatorio'
-      if (!formData.numero_identificacion.trim()) newErrors.numero_identificacion = 'El número de identificación es obligatorio'
-      if (!formData.fecha_nacimiento) newErrors.fecha_nacimiento = 'La fecha de nacimiento es obligatoria'
-      if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-        newErrors.email = 'El email no tiene un formato válido'
-      }
-    } else if (currentTab === 1) {
-      // Detalles del Contrato
-      if (!formData.numero_contrato_helisa.trim()) newErrors.numero_contrato_helisa = 'El número de contrato es obligatorio'
-      if (!formData.empresa_final_id) newErrors.empresa_final_id = 'Debe seleccionar una empresa cliente'
-      if (formData.tipo_contrato !== 'Indefinido' && !formData.fecha_fin) {
-        newErrors.fecha_fin = 'La fecha fin es obligatoria para contratos con duración definida'
-      }
-      if (formData.salario && formData.salario < 0) newErrors.salario = 'El salario debe ser mayor o igual a 0'
+    // Información Personal (Tab 0)
+    if (!formData.primer_nombre.trim()) {
+      newErrors.primer_nombre = 'El primer nombre es obligatorio'
+      errorsByTab[0].push('primer_nombre')
     }
+    if (!formData.primer_apellido.trim()) {
+      newErrors.primer_apellido = 'El primer apellido es obligatorio'
+      errorsByTab[0].push('primer_apellido')
+    }
+    if (!formData.numero_identificacion.trim()) {
+      newErrors.numero_identificacion = 'El número de identificación es obligatorio'
+      errorsByTab[0].push('numero_identificacion')
+    }
+    if (!formData.fecha_nacimiento) {
+      newErrors.fecha_nacimiento = 'La fecha de nacimiento es obligatoria'
+      errorsByTab[0].push('fecha_nacimiento')
+    }
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'El email no tiene un formato válido'
+      errorsByTab[0].push('email')
+    }
+
+    // Detalles del Contrato (Tab 1)
+    // El número de contrato no es obligatorio en edición - solo al aprobar
+    if (!formData.empresa_final_id) {
+      newErrors.empresa_final_id = 'Debe seleccionar una empresa cliente'
+      errorsByTab[1].push('empresa_final_id')
+    }
+    if (formData.tipo_contrato !== 'Indefinido' && !formData.fecha_fin) {
+      newErrors.fecha_fin = 'La fecha fin es obligatoria para contratos con duración definida'
+      errorsByTab[1].push('fecha_fin')
+    }
+    if (formData.salario && formData.salario < 0) {
+      newErrors.salario = 'El salario debe ser mayor o igual a 0'
+      errorsByTab[1].push('salario')
+    }
+
     // Tab 2 (Onboarding) no tiene validaciones obligatorias
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    return { errors: newErrors, errorsByTab }
+  }
+
+  // Validar pestaña actual (para retrocompatibilidad)
+  const validateCurrentTab = (): boolean => {
+    const { errors } = validateAllFields()
+    const currentTabErrors = Object.keys(errors).filter(field => {
+      if (currentTab === 0) {
+        return ['primer_nombre', 'primer_apellido', 'numero_identificacion', 'fecha_nacimiento', 'email'].includes(field)
+      } else if (currentTab === 1) {
+        return ['empresa_final_id', 'fecha_fin', 'salario'].includes(field)
+      }
+      return false
+    })
+
+    const currentTabErrorsObj = currentTabErrors.reduce((acc, field) => {
+      acc[field] = errors[field]
+      return acc
+    }, {} as Record<string, string>)
+
+    setErrors(currentTabErrorsObj)
+    return currentTabErrors.length === 0
   }
 
   // Manejar cambios en el formulario
@@ -301,9 +330,13 @@ export default function ContractModal({
     }
   }
 
-  // Navegación entre pestañas
+  // Navegación libre entre pestañas
+  const goToTab = (tabIndex: number) => {
+    setCurrentTab(tabIndex)
+  }
+
   const nextTab = () => {
-    if (validateCurrentTab() && currentTab < tabs.length - 1) {
+    if (currentTab < tabs.length - 1) {
       setCurrentTab(currentTab + 1)
     }
   }
@@ -314,9 +347,33 @@ export default function ContractModal({
     }
   }
 
-  // Enviar formulario
+  // Enviar formulario con validación inteligente
   const handleSubmit = async () => {
-    if (!validateCurrentTab()) return
+    const { errors, errorsByTab } = validateAllFields()
+    
+    if (Object.keys(errors).length > 0) {
+      // Encontrar la primera pestaña con errores
+      const firstTabWithErrors = Object.keys(errorsByTab).find(tabIndex => 
+        errorsByTab[parseInt(tabIndex)].length > 0
+      )
+      
+      if (firstTabWithErrors) {
+        setCurrentTab(parseInt(firstTabWithErrors))
+        setErrors(errors)
+        
+        // Mostrar mensaje indicando que hay errores y dónde
+        const tabNames = ['Información Personal', 'Detalles del Contrato', 'Onboarding']
+        const errorTabs = Object.keys(errorsByTab)
+          .filter(tabIndex => errorsByTab[parseInt(tabIndex)].length > 0)
+          .map(tabIndex => tabNames[parseInt(tabIndex)])
+        
+        setErrors({
+          ...errors,
+          general: `Hay campos obligatorios pendientes en: ${errorTabs.join(', ')}`
+        })
+      }
+      return
+    }
 
     setLoading(true)
     try {
@@ -336,7 +393,7 @@ export default function ContractModal({
         empresa_final_id: formData.empresa_final_id,
         ciudad_labora: formData.ciudad_labora || null,
         cargo: formData.cargo || null,
-        numero_contrato_helisa: formData.numero_contrato_helisa,
+        numero_contrato_helisa: null,
         base_sena: formData.base_sena,
         fecha_ingreso: formData.fecha_ingreso || null,
         tipo_contrato: formData.tipo_contrato || null,
@@ -416,12 +473,12 @@ export default function ContractModal({
         {/* Header con stepper */}
         <div className="bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white p-6">
           <div className="flex items-center justify-between mb-4">
-            <div>
+            <div className="flex-1">
               <h2 className="text-2xl font-bold">
-                {mode === 'create' ? 'Nuevo Contrato' : 'Editar Contrato'}
+                {mode === 'create' ? 'Nuevo Contrato' : isReadOnly ? 'Ver Contrato' : 'Editar Contrato'}
               </h2>
               <p className="text-[#87E0E0] text-sm">
-                {mode === 'create' ? 'Crear contrato laboral completo' : 'Modificar información del contrato'}
+                {mode === 'create' ? 'Crear contrato laboral completo' : isReadOnly ? 'Información detallada del contrato' : 'Modificar información del contrato'}
               </p>
             </div>
             <button
@@ -432,29 +489,34 @@ export default function ContractModal({
             </button>
           </div>
 
-          {/* Stepper horizontal */}
+          {/* Stepper horizontal clickeable */}
           <div className="flex items-center justify-between">
             {tabs.map((tab, index) => (
               <div key={tab.id} className="flex items-center">
                 <div className="flex items-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                  <button
+                    onClick={() => goToTab(index)}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 ${
                       currentTab === index
-                        ? 'bg-[#87E0E0] text-[#004C4C]'
+                        ? 'bg-[#87E0E0] text-[#004C4C] shadow-lg'
                         : currentTab > index
-                        ? 'bg-[#5FD3D2] text-[#004C4C]'
-                        : 'bg-[#0A6A6A] text-[#87E0E0]'
+                        ? 'bg-[#5FD3D2] text-[#004C4C] hover:bg-[#87E0E0]'
+                        : 'bg-[#0A6A6A] text-[#87E0E0] hover:bg-[#065C5C]'
                     }`}
+                    title={`Ir a ${tab.name}`}
                   >
                     <tab.icon className="h-5 w-5" />
-                  </div>
-                  <div className="ml-3 hidden sm:block">
-                    <p className={`text-sm font-medium ${
+                  </button>
+                  <button
+                    onClick={() => goToTab(index)}
+                    className="ml-3 hidden sm:block"
+                  >
+                    <p className={`text-sm font-medium transition-colors hover:text-[#87E0E0] ${
                       currentTab >= index ? 'text-[#87E0E0]' : 'text-[#58BFC2]'
                     }`}>
                       {tab.name}
                     </p>
-                  </div>
+                  </button>
                 </div>
                 {index < tabs.length - 1 && (
                   <ChevronRight className="h-5 w-5 text-[#58BFC2] mx-2 hidden sm:block" />
@@ -488,10 +550,8 @@ export default function ContractModal({
                     <input
                       type="text"
                       value={formData.primer_nombre}
-                      onChange={(e) => handleInputChange('primer_nombre', e.target.value)}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
-                        errors.primer_nombre ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      onChange={(e) => !isReadOnly && handleInputChange('primer_nombre', e.target.value)}
+                      {...getInputProps('primer_nombre', !!errors.primer_nombre)}
                       placeholder="Ej: Juan"
                     />
                     {errors.primer_nombre && (
@@ -506,8 +566,8 @@ export default function ContractModal({
                     <input
                       type="text"
                       value={formData.segundo_nombre || ''}
-                      onChange={(e) => handleInputChange('segundo_nombre', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('segundo_nombre', e.target.value)}
+                      {...getInputProps('segundo_nombre')}
                       placeholder="Ej: Carlos"
                     />
                   </div>
@@ -519,10 +579,8 @@ export default function ContractModal({
                     <input
                       type="text"
                       value={formData.primer_apellido}
-                      onChange={(e) => handleInputChange('primer_apellido', e.target.value)}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
-                        errors.primer_apellido ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      onChange={(e) => !isReadOnly && handleInputChange('primer_apellido', e.target.value)}
+                      {...getInputProps('primer_apellido', !!errors.primer_apellido)}
                       placeholder="Ej: Pérez"
                     />
                     {errors.primer_apellido && (
@@ -537,8 +595,8 @@ export default function ContractModal({
                     <input
                       type="text"
                       value={formData.segundo_apellido || ''}
-                      onChange={(e) => handleInputChange('segundo_apellido', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('segundo_apellido', e.target.value)}
+                      {...getInputProps('segundo_apellido')}
                       placeholder="Ej: González"
                     />
                   </div>
@@ -549,8 +607,8 @@ export default function ContractModal({
                     </label>
                     <select
                       value={formData.tipo_identificacion}
-                      onChange={(e) => handleInputChange('tipo_identificacion', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('tipo_identificacion', e.target.value)}
+                      {...getInputProps('tipo_identificacion')}
                     >
                       <option value="CC">Cédula de Ciudadanía</option>
                       <option value="CE">Cédula de Extranjería</option>
@@ -567,10 +625,8 @@ export default function ContractModal({
                     <input
                       type="text"
                       value={formData.numero_identificacion}
-                      onChange={(e) => handleInputChange('numero_identificacion', e.target.value)}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
-                        errors.numero_identificacion ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      onChange={(e) => !isReadOnly && handleInputChange('numero_identificacion', e.target.value)}
+                      {...getInputProps('numero_identificacion', !!errors.numero_identificacion)}
                       placeholder="Ej: 1234567890"
                     />
                     {errors.numero_identificacion && (
@@ -585,10 +641,8 @@ export default function ContractModal({
                     <input
                       type="date"
                       value={formData.fecha_nacimiento}
-                      onChange={(e) => handleInputChange('fecha_nacimiento', e.target.value)}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
-                        errors.fecha_nacimiento ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      onChange={(e) => !isReadOnly && handleInputChange('fecha_nacimiento', e.target.value)}
+                      {...getInputProps('fecha_nacimiento', !!errors.fecha_nacimiento)}
                     />
                     {errors.fecha_nacimiento && (
                       <p className="text-red-600 text-xs mt-1">{errors.fecha_nacimiento}</p>
@@ -601,8 +655,8 @@ export default function ContractModal({
                     </label>
                     <select
                       value={formData.genero}
-                      onChange={(e) => handleInputChange('genero', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('genero', e.target.value)}
+                      {...getInputProps('genero')}
                     >
                       <option value="M">Masculino</option>
                       <option value="F">Femenino</option>
@@ -616,8 +670,8 @@ export default function ContractModal({
                     <input
                       type="tel"
                       value={formData.celular || ''}
-                      onChange={(e) => handleInputChange('celular', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('celular', e.target.value)}
+                      {...getInputProps('celular')}
                       placeholder="Ej: +57 300 123 4567"
                     />
                   </div>
@@ -629,10 +683,8 @@ export default function ContractModal({
                     <input
                       type="email"
                       value={formData.email || ''}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
-                        errors.email ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      onChange={(e) => !isReadOnly && handleInputChange('email', e.target.value)}
+                      {...getInputProps('email', !!errors.email)}
                       placeholder="Ej: juan.perez@email.com"
                     />
                     {errors.email && (
@@ -655,8 +707,8 @@ export default function ContractModal({
                     </label>
                     <select
                       value={formData.empresa_interna}
-                      onChange={(e) => handleInputChange('empresa_interna', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('empresa_interna', e.target.value)}
+                      {...getInputProps('empresa_interna')}
                     >
                       <option value="Good">Good</option>
                       <option value="CPS">CPS</option>
@@ -669,10 +721,8 @@ export default function ContractModal({
                     </label>
                     <select
                       value={formData.empresa_final_id}
-                      onChange={(e) => handleInputChange('empresa_final_id', e.target.value)}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
-                        errors.empresa_final_id ? 'border-red-300' : 'border-gray-300'
-                      }`}
+                      onChange={(e) => !isReadOnly && handleInputChange('empresa_final_id', e.target.value)}
+                      {...getInputProps('empresa_final_id', !!errors.empresa_final_id)}
                     >
                       <option value="">Seleccionar empresa...</option>
                       {companies.map(company => (
@@ -693,8 +743,8 @@ export default function ContractModal({
                     <input
                       type="text"
                       value={formData.ciudad_labora || ''}
-                      onChange={(e) => handleInputChange('ciudad_labora', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('ciudad_labora', e.target.value)}
+                      {...getInputProps('ciudad_labora')}
                       placeholder="Ej: Bogotá"
                     />
                   </div>
@@ -706,37 +756,21 @@ export default function ContractModal({
                     <input
                       type="text"
                       value={formData.cargo || ''}
-                      onChange={(e) => handleInputChange('cargo', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('cargo', e.target.value)}
+                      {...getInputProps('cargo')}
                       placeholder="Ej: Desarrollador"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Número de Contrato Helisa *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.numero_contrato_helisa}
-                      onChange={(e) => handleInputChange('numero_contrato_helisa', e.target.value)}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
-                        errors.numero_contrato_helisa ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      placeholder="Ej: CONT-2025-001"
-                    />
-                    {errors.numero_contrato_helisa && (
-                      <p className="text-red-600 text-xs mt-1">{errors.numero_contrato_helisa}</p>
-                    )}
-                  </div>
+
 
                   <div className="flex items-center space-x-3">
                     <input
                       type="checkbox"
                       id="base_sena"
                       checked={formData.base_sena}
-                      onChange={(e) => handleInputChange('base_sena', e.target.checked)}
-                      className="w-5 h-5 text-[#004C4C] rounded focus:ring-[#87E0E0] border-gray-300"
+                      onChange={(e) => !isReadOnly && handleInputChange('base_sena', e.target.checked)}
+                      {...getCheckboxProps()}
                     />
                     <label htmlFor="base_sena" className="text-sm font-medium text-gray-700">
                       Aporta al SENA
@@ -750,8 +784,8 @@ export default function ContractModal({
                     <input
                       type="date"
                       value={formData.fecha_ingreso || ''}
-                      onChange={(e) => handleInputChange('fecha_ingreso', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('fecha_ingreso', e.target.value)}
+                      {...getInputProps('fecha_ingreso')}
                     />
                   </div>
 
@@ -761,8 +795,8 @@ export default function ContractModal({
                     </label>
                     <select
                       value={formData.tipo_contrato || ''}
-                      onChange={(e) => handleInputChange('tipo_contrato', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('tipo_contrato', e.target.value)}
+                      {...getInputProps('tipo_contrato')}
                     >
                       <option value="Indefinido">Indefinido</option>
                       <option value="Fijo">Fijo</option>
@@ -780,10 +814,8 @@ export default function ContractModal({
                       <input
                         type="date"
                         value={formData.fecha_fin || ''}
-                        onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
-                        className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
-                          errors.fecha_fin ? 'border-red-300' : 'border-gray-300'
-                        }`}
+                        onChange={(e) => !isReadOnly && handleInputChange('fecha_fin', e.target.value)}
+                        {...getInputProps('fecha_fin', !!errors.fecha_fin)}
                       />
                       {errors.fecha_fin && (
                         <p className="text-red-600 text-xs mt-1">{errors.fecha_fin}</p>
@@ -797,8 +829,8 @@ export default function ContractModal({
                     </label>
                     <select
                       value={formData.tipo_salario || ''}
-                      onChange={(e) => handleInputChange('tipo_salario', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('tipo_salario', e.target.value)}
+                      {...getInputProps('tipo_salario')}
                     >
                       <option value="Integral">Integral</option>
                       <option value="Ordinario">Ordinario</option>
@@ -810,15 +842,16 @@ export default function ContractModal({
                       Salario
                     </label>
                     <input
-                      type="number"
-                      min="0"
-                      step="1000"
-                      value={formData.salario || ''}
-                      onChange={(e) => handleInputChange('salario', parseFloat(e.target.value) || 0)}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all ${
-                        errors.salario ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      placeholder="Ej: 3500000"
+                      type="text"
+                      value={formData.salario ? formatNumberWithDots(formData.salario) : ''}
+                      onChange={(e) => {
+                        if (!isReadOnly) {
+                          const numericValue = parseNumberFromDots(e.target.value)
+                          handleInputChange('salario', numericValue)
+                        }
+                      }}
+                      {...getInputProps('salario', !!errors.salario)}
+                      placeholder="Ej: 3.500.000"
                     />
                     {errors.salario && (
                       <p className="text-red-600 text-xs mt-1">{errors.salario}</p>
@@ -830,13 +863,16 @@ export default function ContractModal({
                       Auxilio Salarial
                     </label>
                     <input
-                      type="number"
-                      min="0"
-                      step="1000"
-                      value={formData.auxilio_salarial || ''}
-                      onChange={(e) => handleInputChange('auxilio_salarial', parseFloat(e.target.value) || 0)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
-                      placeholder="Ej: 150000"
+                      type="text"
+                      value={formData.auxilio_salarial ? formatNumberWithDots(formData.auxilio_salarial) : ''}
+                      onChange={(e) => {
+                        if (!isReadOnly) {
+                          const numericValue = parseNumberFromDots(e.target.value)
+                          handleInputChange('auxilio_salarial', numericValue)
+                        }
+                      }}
+                      {...getInputProps('auxilio_salarial')}
+                      placeholder="Ej: 150.000"
                     />
                   </div>
 
@@ -847,8 +883,8 @@ export default function ContractModal({
                     <input
                       type="text"
                       value={formData.auxilio_salarial_concepto || ''}
-                      onChange={(e) => handleInputChange('auxilio_salarial_concepto', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('auxilio_salarial_concepto', e.target.value)}
+                      {...getInputProps('auxilio_salarial_concepto')}
                       placeholder="Ej: Transporte"
                     />
                   </div>
@@ -858,13 +894,16 @@ export default function ContractModal({
                       Auxilio No Salarial
                     </label>
                     <input
-                      type="number"
-                      min="0"
-                      step="1000"
-                      value={formData.auxilio_no_salarial || ''}
-                      onChange={(e) => handleInputChange('auxilio_no_salarial', parseFloat(e.target.value) || 0)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
-                      placeholder="Ej: 100000"
+                      type="text"
+                      value={formData.auxilio_no_salarial ? formatNumberWithDots(formData.auxilio_no_salarial) : ''}
+                      onChange={(e) => {
+                        if (!isReadOnly) {
+                          const numericValue = parseNumberFromDots(e.target.value)
+                          handleInputChange('auxilio_no_salarial', numericValue)
+                        }
+                      }}
+                      {...getInputProps('auxilio_no_salarial')}
+                      placeholder="Ej: 100.000"
                     />
                   </div>
 
@@ -875,8 +914,8 @@ export default function ContractModal({
                     <input
                       type="text"
                       value={formData.auxilio_no_salarial_concepto || ''}
-                      onChange={(e) => handleInputChange('auxilio_no_salarial_concepto', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                      onChange={(e) => !isReadOnly && handleInputChange('auxilio_no_salarial_concepto', e.target.value)}
+                      {...getInputProps('auxilio_no_salarial_concepto')}
                       placeholder="Ej: Alimentación"
                     />
                   </div>
@@ -895,8 +934,8 @@ export default function ContractModal({
                         min="0"
                         max="10"
                         value={formData.beneficiario_hijo}
-                        onChange={(e) => handleInputChange('beneficiario_hijo', parseInt(e.target.value) || 0)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                        onChange={(e) => !isReadOnly && handleInputChange('beneficiario_hijo', parseInt(e.target.value) || 0)}
+                        {...getInputProps('beneficiario_hijo')}
                       />
                     </div>
 
@@ -906,8 +945,8 @@ export default function ContractModal({
                       </label>
                       <select
                         value={formData.beneficiario_madre}
-                        onChange={(e) => handleInputChange('beneficiario_madre', parseInt(e.target.value))}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                        onChange={(e) => !isReadOnly && handleInputChange('beneficiario_madre', parseInt(e.target.value))}
+                        {...getInputProps('beneficiario_madre')}
                       >
                         <option value={0}>No</option>
                         <option value={1}>Sí</option>
@@ -920,8 +959,8 @@ export default function ContractModal({
                       </label>
                       <select
                         value={formData.beneficiario_padre}
-                        onChange={(e) => handleInputChange('beneficiario_padre', parseInt(e.target.value))}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                        onChange={(e) => !isReadOnly && handleInputChange('beneficiario_padre', parseInt(e.target.value))}
+                        {...getInputProps('beneficiario_padre')}
                       >
                         <option value={0}>No</option>
                         <option value={1}>Sí</option>
@@ -934,12 +973,42 @@ export default function ContractModal({
                       </label>
                       <select
                         value={formData.beneficiario_conyuge}
-                        onChange={(e) => handleInputChange('beneficiario_conyuge', parseInt(e.target.value))}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                        onChange={(e) => !isReadOnly && handleInputChange('beneficiario_conyuge', parseInt(e.target.value))}
+                        {...getInputProps('beneficiario_conyuge')}
                       >
                         <option value={0}>No</option>
                         <option value={1}>Sí</option>
                       </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fechas de Inscripción Beneficiarios */}
+                <div className="bg-blue-50 p-6 rounded-xl">
+                  <h4 className="text-md font-semibold text-gray-900 mb-4">Fechas de Inscripción Beneficiarios</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Fecha de Solicitud
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.fecha_solicitud || ''}
+                        onChange={(e) => !isReadOnly && handleInputChange('fecha_solicitud', e.target.value)}
+                        {...getInputProps('fecha_solicitud')}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Fecha de Radicado
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.fecha_radicado || ''}
+                        onChange={(e) => !isReadOnly && handleInputChange('fecha_radicado', e.target.value)}
+                        {...getInputProps('fecha_radicado')}
+                      />
                     </div>
                   </div>
                 </div>
@@ -971,32 +1040,7 @@ export default function ContractModal({
                   </div>
                 </div>
 
-                {/* Fechas importantes */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50 p-6 rounded-xl">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Fecha de Solicitud
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.fecha_solicitud || ''}
-                      onChange={(e) => handleInputChange('fecha_solicitud', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
-                    />
-                  </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Fecha de Radicado
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.fecha_radicado || ''}
-                      onChange={(e) => handleInputChange('fecha_radicado', e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
-                    />
-                  </div>
-                </div>
 
                 {/* Checkboxes de onboarding en grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1020,8 +1064,8 @@ export default function ContractModal({
                           type="checkbox"
                           id={field.key}
                           checked={formData[field.key as keyof Contract] as boolean}
-                          onChange={(e) => handleInputChange(field.key, e.target.checked)}
-                          className="w-5 h-5 text-[#004C4C] rounded focus:ring-[#87E0E0] border-gray-300"
+                          onChange={(e) => !isReadOnly && handleInputChange(field.key, e.target.checked)}
+                          {...getCheckboxProps()}
                         />
                         <label htmlFor={field.key} className="text-sm font-medium text-gray-700 leading-relaxed cursor-pointer">
                           {field.label}
@@ -1038,9 +1082,9 @@ export default function ContractModal({
                   </label>
                   <input
                     type="url"
-                                          value={formData.dropbox || ''}
-                    onChange={(e) => handleInputChange('dropbox', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all"
+                    value={formData.dropbox || ''}
+                    onChange={(e) => !isReadOnly && handleInputChange('dropbox', e.target.value)}
+                    {...getInputProps('dropbox')}
                     placeholder="https://dropbox.com/folder/contract-001"
                   />
                 </div>
@@ -1052,10 +1096,11 @@ export default function ContractModal({
                   </label>
                   <textarea
                     rows={4}
-                                          value={formData.observacion || ''}
-                    onChange={(e) => handleInputChange('observacion', e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all resize-none"
+                    value={formData.observacion || ''}
+                    onChange={(e) => !isReadOnly && handleInputChange('observacion', e.target.value)}
+                    {...getInputProps('observacion')}
                     placeholder="Notas adicionales sobre el contrato o proceso de onboarding..."
+                    style={{ resize: 'none' }}
                   />
                 </div>
               </div>
@@ -1094,9 +1139,9 @@ export default function ContractModal({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={loading || isReadOnly}
               className={`px-6 py-2 rounded-xl transition-all ${
-                loading
+                loading || isReadOnly
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-[#004C4C] hover:bg-[#065C5C]'
               } text-white flex items-center space-x-2`}
@@ -1104,7 +1149,14 @@ export default function ContractModal({
               {loading && (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               )}
-              <span>{mode === 'create' ? 'Crear Contrato' : 'Guardar Cambios'}</span>
+              <span>
+                {isReadOnly 
+                  ? 'Solo Lectura' 
+                  : mode === 'create' 
+                    ? 'Crear Contrato' 
+                    : 'Guardar Cambios'
+                }
+              </span>
             </button>
           )}
         </div>

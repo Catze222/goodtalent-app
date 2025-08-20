@@ -12,70 +12,13 @@ import {
   Edit,
   ExternalLink,
   Badge,
-  FileText
+  FileText,
+  Trash2
 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
-
-interface Contract {
-  id: string
-  primer_nombre: string
-  segundo_nombre?: string | null
-  primer_apellido: string
-  segundo_apellido?: string | null
-  tipo_identificacion: string
-  numero_identificacion: string
-  fecha_nacimiento: string
-  genero: string
-  celular?: string | null
-  email?: string | null
-  empresa_interna: string
-  empresa_final_id: string
-  ciudad_labora?: string | null
-  cargo?: string | null
-  numero_contrato_helisa: string
-  base_sena: boolean
-  fecha_ingreso?: string | null
-  tipo_contrato?: string | null
-  fecha_fin?: string | null
-  tipo_salario?: string | null
-  salario?: number | null
-  auxilio_salarial?: number | null
-  auxilio_salarial_concepto?: string | null
-  auxilio_no_salarial?: number | null
-  auxilio_no_salarial_concepto?: string | null
-  beneficiario_hijo: number
-  beneficiario_madre: number
-  beneficiario_padre: number
-  beneficiario_conyuge: number
-  fecha_solicitud?: string | null
-  fecha_radicado?: string | null
-  programacion_cita_examenes: boolean
-  examenes: boolean
-  solicitud_inscripcion_arl: boolean
-  inscripcion_arl: boolean
-  envio_contrato: boolean
-  recibido_contrato_firmado: boolean
-  solicitud_eps: boolean
-  confirmacion_eps: boolean
-  envio_inscripcion_caja: boolean
-  confirmacion_inscripcion_caja: boolean
-  dropbox?: string | null
-  radicado_eps: boolean
-  radicado_ccf: boolean
-  observacion?: string | null
-  created_at: string
-  updated_at: string
-  created_by: string
-  updated_by: string
-  contracts_created_by_handle?: string | null
-  contracts_updated_by_handle?: string | null
-  contracts_full_name?: string | null
-  contracts_onboarding_progress?: number | null
-  company?: {
-    name: string
-    tax_id: string
-  }
-}
+import { Contract, getContractStatusConfig } from '../../types/contract'
+import { ContractStatusCompact } from '../ui/ContractStatusBadges'
+import ContractApprovalButton from '../ui/ContractApprovalButton'
 
 interface ContractCardProps {
   contract: Contract
@@ -83,6 +26,7 @@ interface ContractCardProps {
   onUpdate: () => void
   canUpdate: boolean
   canDelete: boolean
+  onApprove?: (contract: Contract) => void
 }
 
 /**
@@ -94,9 +38,11 @@ export default function ContractCard({
   onEdit, 
   onUpdate, 
   canUpdate, 
-  canDelete 
+  canDelete,
+  onApprove 
 }: ContractCardProps) {
   const [updatingOnboarding, setUpdatingOnboarding] = useState(false)
+  const statusConfig = getContractStatusConfig(contract)
 
   // Formatear fechas
   const formatDate = (dateString?: string | null) => {
@@ -108,7 +54,7 @@ export default function ContractCard({
     })
   }
 
-  // Formatear moneda
+  // Formatear moneda con puntos como separadores
   const formatCurrency = (amount?: number | null) => {
     if (!amount) return '-'
     return new Intl.NumberFormat('es-CO', {
@@ -116,7 +62,7 @@ export default function ContractCard({
       currency: 'COP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount)
+    }).format(amount).replace(/,/g, '.')
   }
 
   // Calcular estado del progreso
@@ -141,7 +87,7 @@ export default function ContractCard({
 
   // Quick toggle para campos de onboarding más importantes
   const quickToggleField = async (fieldName: string, currentValue: boolean) => {
-    if (!canUpdate || updatingOnboarding) return
+    if (!canUpdate || updatingOnboarding || !statusConfig.can_edit) return
 
     setUpdatingOnboarding(true)
     try {
@@ -180,10 +126,12 @@ export default function ContractCard({
                 </span>
               )}
             </div>
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <div className="flex items-center space-x-2 text-sm text-gray-600 mb-2">
               <Badge className="h-3 w-3" />
               <span>{contract.numero_contrato_helisa}</span>
             </div>
+            {/* Badges de estado */}
+            <ContractStatusCompact contract={contract} />
           </div>
           
           {/* Progress ring */}
@@ -212,23 +160,38 @@ export default function ContractCard({
           </div>
         </div>
 
-        {/* Info básica */}
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="flex items-center space-x-2 text-gray-600">
-            <User className="h-3 w-3" />
-            <span>{contract.numero_identificacion}</span>
+        {/* Info básica - Layout inteligente */}
+        <div className="space-y-2 text-sm">
+          {/* Primera fila: ID e ingreso */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center space-x-2 text-gray-600">
+              <span className="text-xs font-medium text-gray-500">ID:</span>
+              <span>{contract.tipo_identificacion} {contract.numero_identificacion}</span>
+            </div>
+            <div className="flex items-center space-x-2 text-gray-600">
+              <span className="text-xs font-medium text-gray-500">Ingreso:</span>
+              <span>{formatDate(contract.fecha_ingreso)}</span>
+            </div>
           </div>
-          <div className="flex items-center space-x-2 text-gray-600">
-            <Building2 className="h-3 w-3" />
-            <span className="truncate">{contract.company?.name || 'Sin empresa'}</span>
+
+          {/* Segunda fila: Terminación si existe */}
+          {contract.fecha_fin && (
+            <div className="flex items-center space-x-2 text-gray-600">
+              <span className="text-xs font-medium text-gray-500">Terminación:</span>
+              <span className="text-orange-600 font-medium">{formatDate(contract.fecha_fin)}</span>
+            </div>
+          )}
+          
+          {/* Segunda fila: Empresa (responsive) */}
+          <div className="text-gray-600">
+            <span className="text-xs font-medium text-gray-500">Empresa: </span>
+            <span className="font-medium">{contract.company?.name || 'Sin empresa'}</span>
           </div>
+          
+          {/* Tercera fila: Salario */}
           <div className="flex items-center space-x-2 text-gray-600">
-            <Calendar className="h-3 w-3" />
-            <span>{formatDate(contract.fecha_ingreso)}</span>
-          </div>
-          <div className="flex items-center space-x-2 text-gray-600">
-            <DollarSign className="h-3 w-3" />
-            <span>{formatCurrency(contract.salario)}</span>
+            <span className="text-xs font-medium text-gray-500">Salario:</span>
+            <span className="font-medium">{formatCurrency(contract.salario)}</span>
           </div>
         </div>
 
@@ -240,111 +203,119 @@ export default function ContractCard({
       </div>
 
       {/* Quick actions para onboarding */}
-      {canUpdate && (
+      {canUpdate && statusConfig.can_edit && (
         <div className="px-4 py-3 bg-white bg-opacity-60 border-t border-white border-opacity-50">
           <div className="text-xs text-gray-600 mb-2 font-medium">Quick Actions:</div>
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => quickToggleField('examenes', contract.examenes)}
               disabled={updatingOnboarding}
-              className={`flex items-center space-x-1 text-xs p-2 rounded-lg transition-colors ${
+              className={`flex items-center justify-center text-xs p-2 rounded-lg transition-colors font-medium ${
                 contract.examenes
                   ? 'bg-green-100 text-green-700 hover:bg-green-200'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               } ${updatingOnboarding ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {contract.examenes ? (
-                <CheckCircle className="h-3 w-3" />
-              ) : (
-                <Clock className="h-3 w-3" />
-              )}
-              <span>Exámenes</span>
+              <span>{contract.examenes ? '✓' : '○'} Exámenes</span>
             </button>
             
             <button
               onClick={() => quickToggleField('inscripcion_arl', contract.inscripcion_arl)}
               disabled={updatingOnboarding}
-              className={`flex items-center space-x-1 text-xs p-2 rounded-lg transition-colors ${
+              className={`flex items-center justify-center text-xs p-2 rounded-lg transition-colors font-medium ${
                 contract.inscripcion_arl
                   ? 'bg-green-100 text-green-700 hover:bg-green-200'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               } ${updatingOnboarding ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {contract.inscripcion_arl ? (
-                <CheckCircle className="h-3 w-3" />
-              ) : (
-                <Clock className="h-3 w-3" />
-              )}
-              <span>ARL</span>
+              <span>{contract.inscripcion_arl ? '✓' : '○'} ARL</span>
             </button>
 
             <button
               onClick={() => quickToggleField('confirmacion_eps', contract.confirmacion_eps)}
               disabled={updatingOnboarding}
-              className={`flex items-center space-x-1 text-xs p-2 rounded-lg transition-colors ${
+              className={`flex items-center justify-center text-xs p-2 rounded-lg transition-colors font-medium ${
                 contract.confirmacion_eps
                   ? 'bg-green-100 text-green-700 hover:bg-green-200'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               } ${updatingOnboarding ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {contract.confirmacion_eps ? (
-                <CheckCircle className="h-3 w-3" />
-              ) : (
-                <Clock className="h-3 w-3" />
-              )}
-              <span>EPS</span>
+              <span>{contract.confirmacion_eps ? '✓' : '○'} EPS</span>
             </button>
 
             <button
               onClick={() => quickToggleField('recibido_contrato_firmado', contract.recibido_contrato_firmado)}
               disabled={updatingOnboarding}
-              className={`flex items-center space-x-1 text-xs p-2 rounded-lg transition-colors ${
+              className={`flex items-center justify-center text-xs p-2 rounded-lg transition-colors font-medium ${
                 contract.recibido_contrato_firmado
                   ? 'bg-green-100 text-green-700 hover:bg-green-200'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               } ${updatingOnboarding ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {contract.recibido_contrato_firmado ? (
-                <CheckCircle className="h-3 w-3" />
-              ) : (
-                <Clock className="h-3 w-3" />
-              )}
-              <span>Contrato</span>
+              <span>{contract.recibido_contrato_firmado ? '✓' : '○'} Contrato</span>
             </button>
           </div>
         </div>
       )}
 
       {/* Footer con acciones */}
-      <div className="px-4 py-3 bg-white bg-opacity-80 border-t border-white border-opacity-50 flex items-center justify-between">
-        <div className="text-xs text-gray-500">
-          {contract.contracts_updated_by_handle && (
-            <span>Por {contract.contracts_updated_by_handle}</span>
-          )}
-        </div>
+      <div className="px-4 py-3 bg-white bg-opacity-80 border-t border-white border-opacity-50">
+        {/* Botón de aprobación si está en borrador */}
+        {statusConfig.can_approve && onApprove && (
+          <div className="mb-3">
+            <ContractApprovalButton 
+              contract={contract} 
+              onSuccess={onUpdate}
+              className="w-full text-sm"
+            />
+          </div>
+        )}
         
-        <div className="flex items-center space-x-2">
-          {contract.dropbox && (
-            <a
-              href={contract.dropbox}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#004C4C] hover:text-[#065C5C] transition-colors"
-              title="Ver documentos"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          )}
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-500">
+            {contract.contracts_updated_by_handle && (
+              <span>Por {contract.contracts_updated_by_handle}</span>
+            )}
+          </div>
           
-          {canUpdate && (
-            <button
-              onClick={() => onEdit(contract)}
-              className="text-[#004C4C] hover:text-[#065C5C] transition-colors"
-              title="Editar contrato"
-            >
-              <Edit className="h-4 w-4" />
-            </button>
-          )}
+          <div className="flex items-center space-x-2">
+            {contract.dropbox && (
+              <a
+                href={contract.dropbox}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#004C4C] hover:text-[#065C5C] transition-colors"
+                title="Ver documentos"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
+            
+            {canUpdate && statusConfig.can_edit && (
+              <button
+                onClick={() => onEdit(contract)}
+                className="text-[#004C4C] hover:text-[#065C5C] transition-colors"
+                title="Editar contrato"
+              >
+                <Edit className="h-4 w-4" />
+              </button>
+            )}
+
+            {canDelete && statusConfig.can_delete && (
+              <button
+                onClick={() => {
+                  if (confirm('¿Estás seguro de que quieres eliminar este contrato? Esta acción no se puede deshacer.')) {
+                    // TODO: Implementar eliminación
+                    console.log('Eliminar contrato:', contract.id)
+                  }
+                }}
+                className="text-red-500 hover:text-red-700 transition-colors"
+                title="Eliminar contrato"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
