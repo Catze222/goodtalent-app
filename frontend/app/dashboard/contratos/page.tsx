@@ -306,7 +306,9 @@ export default function ContratosPage() {
   // Manejar reporte de novedad
   const handleReportNovelty = (contract: Contract) => {
     // Por ahora solo mostrar un toast - aquí se puede integrar con el módulo de novedades futuro
-    showToast(`Iniciando reporte de novedad para ${contract.primer_nombre} ${contract.primer_apellido}`, 'info')
+    setToastType('info')
+    setToastMsg(`Iniciando reporte de novedad para ${contract.primer_nombre} ${contract.primer_apellido}`)
+    setToastOpen(true)
     console.log('Reportar novedad para contrato:', contract)
   }
 
