@@ -22,7 +22,7 @@ export interface Contract {
   empresa_final_id: string
   ciudad_labora?: string | null
   cargo?: string | null
-  numero_contrato_helisa: string
+  numero_contrato_helisa?: string | null
   base_sena: boolean
   fecha_ingreso?: string | null
   tipo_contrato?: string | null
