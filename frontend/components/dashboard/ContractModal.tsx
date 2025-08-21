@@ -38,7 +38,7 @@ export default function ContractModal({
   
   // Lógica de estados del contrato
   const statusConfig = contract ? getContractStatusConfig(contract) : null
-  const isReadOnly = contract && !statusConfig?.can_edit
+  const isReadOnly = Boolean(contract && statusConfig && !statusConfig.can_edit)
   
   const [formData, setFormData] = useState<Contract>({
     primer_nombre: '',
@@ -94,8 +94,8 @@ export default function ContractModal({
 
   // Helper para props de inputs con lógica de solo lectura
   const getInputProps = (fieldName: string, hasError: boolean = false) => ({
-    readOnly: isReadOnly,
-    disabled: isReadOnly,
+    readOnly: !!isReadOnly,
+    disabled: !!isReadOnly,
     tabIndex: isReadOnly ? -1 : 0,
     className: `w-full px-4 py-3 border rounded-xl transition-all ${
       isReadOnly 
@@ -108,7 +108,7 @@ export default function ContractModal({
 
   // Helper para checkboxes
   const getCheckboxProps = () => ({
-    disabled: isReadOnly,
+    disabled: !!isReadOnly,
     className: `${isReadOnly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} w-5 h-5 text-[#004C4C] rounded focus:ring-[#87E0E0] border-gray-300`
   })
 
