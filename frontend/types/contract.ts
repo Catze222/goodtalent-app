@@ -161,7 +161,7 @@ export const getStatusVigenciaConfig = (status: StatusVigencia, daysUntilExpiry?
   switch (status) {
     case 'activo':
       // Si expira en menos de 30 días, mostrar como advertencia
-      if (daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0) {
+      if (daysUntilExpiry !== null && daysUntilExpiry !== undefined && daysUntilExpiry <= 30 && daysUntilExpiry > 0) {
         return {
           label: `Vence en ${daysUntilExpiry} días`,
           color: 'bg-orange-100 text-orange-800 border-orange-200',
