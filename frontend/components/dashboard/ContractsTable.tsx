@@ -242,14 +242,16 @@ export default function ContractsTable({
 
           {/* Filas de la tabla dentro del mismo contenedor */}
           <div className="divide-y divide-gray-100">
-            {contracts.map((contract) => {
-              const isExpanded = expandedRows.has(contract.id)
+            {contracts
+              .filter(contract => contract.id) // Filtrar contratos sin ID
+              .map((contract) => {
+              const isExpanded = expandedRows.has(contract.id!)
               const progress = contract.contracts_onboarding_progress || 0
               const fullName = contract.contracts_full_name || 
                 `${contract.primer_nombre} ${contract.primer_apellido}`
 
               return (
-                <div key={contract.id}>
+                <div key={contract.id!}>
                   {/* Fila principal - Dentro del scroll unificado */}
                   <div className={`grid gap-2 p-3 hover:bg-gray-50 transition-colors`} style={{gridTemplateColumns: generateGridColumns()}}>
                     
@@ -257,7 +259,7 @@ export default function ContractsTable({
                     <div className="flex flex-col items-start space-y-1">
                       <div className="flex items-center space-x-1">
                         <button
-                          onClick={() => toggleRowExpansion(contract.id)}
+                          onClick={() => toggleRowExpansion(contract.id!)}
                           className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                           title="Ver detalles"
                         >
@@ -361,15 +363,15 @@ export default function ContractsTable({
 
                     {/* Todos los campos de onboarding (12 campos) */}
                     {onboardingFields.map(field => {
-                      const isLoading = loadingInline.has(contract.id)
-                      const value = contract[field.key]
+                      const isLoading = loadingInline.has(contract.id!)
+                      const value = contract[field.key as keyof Contract]
                       const statusConfig = getContractStatusConfig(contract)
                       const canEditField = canUpdate && statusConfig.can_edit
                       
                       return (
                         <div key={field.key} className="flex justify-center">
                           <button
-                            onClick={() => handleToggleOnboarding(contract.id, field.key, value)}
+                            onClick={() => handleToggleOnboarding(contract.id!, field.key, Boolean(value))}
                             disabled={!canEditField || isLoading}
                             className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 ${
                               value 
@@ -567,13 +569,15 @@ export default function ContractsTable({
 
       {/* Vista móvil */}
       <div className="lg:hidden divide-y divide-gray-100">
-        {contracts.map((contract) => {
+        {contracts
+          .filter(contract => contract.id) // Filtrar contratos sin ID
+          .map((contract) => {
           const statusConfig = getContractStatusConfig(contract)
           const fullName = contract.contracts_full_name || 
             `${contract.primer_nombre} ${contract.primer_apellido}`
 
           return (
-            <div key={contract.id} className="p-4 space-y-3">
+            <div key={contract.id!} className="p-4 space-y-3">
               {/* Info básica */}
               <div className="space-y-2">
                 <div className="font-medium text-gray-900 text-lg">{fullName}</div>
@@ -628,8 +632,7 @@ export default function ContractsTable({
                   {statusConfig.can_approve && onApprove && (
                     <ContractApprovalButton 
                       contract={contract}
-                      onApprove={onApprove}
-                      size="sm"
+                      onSuccess={() => onApprove(contract)}
                     />
                   )}
                   
