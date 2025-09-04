@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, User, FileText, CheckSquare, ChevronRight, Shield, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { Contract, getContractStatusConfig } from '../../types/contract'
+import OCRButton from '../ocr/OCRButton'
 
 
 
@@ -45,22 +46,23 @@ export default function ContractModal({
     segundo_nombre: '',
     primer_apellido: '',
     segundo_apellido: '',
-    tipo_identificacion: 'CC',
+    tipo_identificacion: '',
     numero_identificacion: '',
+    fecha_expedicion_documento: '',
     fecha_nacimiento: '',
-    genero: 'M',
+    genero: '',
     celular: '',
     email: '',
-    empresa_interna: 'Good',
+    empresa_interna: '',
     empresa_final_id: '',
     ciudad_labora: '',
     cargo: '',
     numero_contrato_helisa: null,
     base_sena: false,
     fecha_ingreso: '',
-    tipo_contrato: 'Indefinido',
+    tipo_contrato: '',
     fecha_fin: '',
-    tipo_salario: 'Ordinario',
+    tipo_salario: '',
     salario: 0,
     auxilio_salarial: 0,
     auxilio_salarial_concepto: '',
@@ -91,6 +93,30 @@ export default function ContractModal({
 
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [fieldConfidence, setFieldConfidence] = useState<Record<string, 'alto' | 'medio' | 'bajo'>>({})
+
+  // Manejar datos extraídos por OCR
+  const handleOCRDataExtracted = (extractedFields: any, confidence: any) => {
+    // Actualizar formData con los campos extraídos
+    setFormData(prev => ({
+      ...prev,
+      ...extractedFields
+    }))
+
+    // Actualizar confianza de los campos
+    setFieldConfidence(confidence)
+
+    // Limpiar errores de campos que fueron llenados automáticamente
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      Object.keys(extractedFields).forEach(field => {
+        if (extractedFields[field]) {
+          delete newErrors[field]
+        }
+      })
+      return newErrors
+    })
+  }
 
   // Helper para props de inputs con lógica de solo lectura
   const getInputProps = (fieldName: string, hasError: boolean = false) => ({
@@ -151,22 +177,23 @@ export default function ContractModal({
           segundo_nombre: contract.segundo_nombre || '',
           primer_apellido: contract.primer_apellido || '',
           segundo_apellido: contract.segundo_apellido || '',
-          tipo_identificacion: contract.tipo_identificacion || 'CC',
+          tipo_identificacion: contract.tipo_identificacion || '',
           numero_identificacion: contract.numero_identificacion || '',
+          fecha_expedicion_documento: contract.fecha_expedicion_documento || '',
           fecha_nacimiento: contract.fecha_nacimiento || '',
-          genero: contract.genero || 'M',
+          genero: contract.genero || '',
           celular: contract.celular || '',
           email: contract.email || '',
-          empresa_interna: contract.empresa_interna || 'Good',
+          empresa_interna: contract.empresa_interna || '',
           empresa_final_id: contract.empresa_final_id || '',
           ciudad_labora: contract.ciudad_labora || '',
           cargo: contract.cargo || '',
           numero_contrato_helisa: contract.numero_contrato_helisa || null,
           base_sena: contract.base_sena || false,
           fecha_ingreso: contract.fecha_ingreso || '',
-          tipo_contrato: contract.tipo_contrato || 'Indefinido',
+          tipo_contrato: contract.tipo_contrato || '',
           fecha_fin: contract.fecha_fin || '',
-          tipo_salario: contract.tipo_salario || 'Ordinario',
+          tipo_salario: contract.tipo_salario || '',
           salario: contract.salario || 0,
           auxilio_salarial: contract.auxilio_salarial || 0,
           auxilio_salarial_concepto: contract.auxilio_salarial_concepto || '',
@@ -200,22 +227,23 @@ export default function ContractModal({
           segundo_nombre: '',
           primer_apellido: '',
           segundo_apellido: '',
-          tipo_identificacion: 'CC',
+          tipo_identificacion: '',
           numero_identificacion: '',
+          fecha_expedicion_documento: '',
           fecha_nacimiento: '',
-          genero: 'M',
+          genero: '',
           celular: '',
           email: '',
-          empresa_interna: 'Good',
-          empresa_final_id: companies.length > 0 ? companies[0].id : '',
+          empresa_interna: '',
+          empresa_final_id: '',
           ciudad_labora: '',
           cargo: '',
           numero_contrato_helisa: null,
           base_sena: false,
           fecha_ingreso: '',
-          tipo_contrato: 'Indefinido',
+          tipo_contrato: '',
           fecha_fin: '',
-          tipo_salario: 'Ordinario',
+          tipo_salario: '',
           salario: 0,
           auxilio_salarial: 0,
           auxilio_salarial_concepto: '',
@@ -240,7 +268,8 @@ export default function ContractModal({
           dropbox: '',
           radicado_eps: false,
           radicado_ccf: false,
-          observacion: ''
+          observacion: '',
+          status_aprobacion: 'borrador'
         })
       }
       setCurrentTab(0)
@@ -543,9 +572,70 @@ export default function ContractModal({
             {/* Tab 1: Información Personal */}
             {currentTab === 0 && (
               <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Información Personal del Empleado</h3>
+                {/* Botón OCR - Solo mostrar en modo creación */}
+                {mode === 'create' && (
+                  <div className="mb-4 flex justify-end">
+                    <OCRButton
+                      onDataExtracted={handleOCRDataExtracted}
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Primero: Tipo de documento y número */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de Identificación *
+                    </label>
+                    <select
+                      value={formData.tipo_identificacion}
+                      onChange={(e) => !isReadOnly && handleInputChange('tipo_identificacion', e.target.value)}
+                      {...getInputProps('tipo_identificacion')}
+                    >
+                      <option value="">Seleccionar tipo de documento...</option>
+                      <option value="CC">Cédula de Ciudadanía</option>
+                      <option value="CE">Cédula de Extranjería</option>
+                      <option value="Pasaporte">Pasaporte</option>
+                      <option value="PEP">PEP</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Número de Identificación *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.numero_identificacion}
+                      onChange={(e) => !isReadOnly && handleInputChange('numero_identificacion', e.target.value)}
+                      {...getInputProps('numero_identificacion', !!errors.numero_identificacion)}
+                      placeholder="Ej: 1234567890"
+                    />
+                    {errors.numero_identificacion && (
+                      <p className="text-red-600 text-xs mt-1">{errors.numero_identificacion}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Fecha de Expedición del Documento
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.fecha_expedicion_documento || ''}
+                      onChange={(e) => !isReadOnly && handleInputChange('fecha_expedicion_documento', e.target.value)}
+                      {...getInputProps('fecha_expedicion_documento')}
+                    />
+                  </div>
+
+                  {/* Separador visual */}
+                  <div className="md:col-span-2">
+                    <hr className="border-gray-200 my-4" />
+                    <h4 className="text-md font-medium text-gray-800 mb-4">Información Personal</h4>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Primer Nombre *
@@ -606,39 +696,6 @@ export default function ContractModal({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tipo de Identificación *
-                    </label>
-                    <select
-                      value={formData.tipo_identificacion}
-                      onChange={(e) => !isReadOnly && handleInputChange('tipo_identificacion', e.target.value)}
-                      {...getInputProps('tipo_identificacion')}
-                    >
-                      <option value="CC">Cédula de Ciudadanía</option>
-                      <option value="CE">Cédula de Extranjería</option>
-                      <option value="Pasaporte">Pasaporte</option>
-                      <option value="PEP">PEP</option>
-                      <option value="Otro">Otro</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Número de Identificación *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.numero_identificacion}
-                      onChange={(e) => !isReadOnly && handleInputChange('numero_identificacion', e.target.value)}
-                      {...getInputProps('numero_identificacion', !!errors.numero_identificacion)}
-                      placeholder="Ej: 1234567890"
-                    />
-                    {errors.numero_identificacion && (
-                      <p className="text-red-600 text-xs mt-1">{errors.numero_identificacion}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Fecha de Nacimiento *
                     </label>
                     <input
@@ -661,6 +718,7 @@ export default function ContractModal({
                       onChange={(e) => !isReadOnly && handleInputChange('genero', e.target.value)}
                       {...getInputProps('genero')}
                     >
+                      <option value="">Seleccionar género...</option>
                       <option value="M">Masculino</option>
                       <option value="F">Femenino</option>
                     </select>
@@ -713,6 +771,7 @@ export default function ContractModal({
                       onChange={(e) => !isReadOnly && handleInputChange('empresa_interna', e.target.value)}
                       {...getInputProps('empresa_interna')}
                     >
+                      <option value="">Seleccionar empresa interna...</option>
                       <option value="Good">Good</option>
                       <option value="CPS">CPS</option>
                     </select>
@@ -801,6 +860,7 @@ export default function ContractModal({
                       onChange={(e) => !isReadOnly && handleInputChange('tipo_contrato', e.target.value)}
                       {...getInputProps('tipo_contrato')}
                     >
+                      <option value="">Seleccionar tipo de contrato...</option>
                       <option value="Indefinido">Indefinido</option>
                       <option value="Fijo">Fijo</option>
                       <option value="Obra">Obra</option>
@@ -835,6 +895,7 @@ export default function ContractModal({
                       onChange={(e) => !isReadOnly && handleInputChange('tipo_salario', e.target.value)}
                       {...getInputProps('tipo_salario')}
                     >
+                      <option value="">Seleccionar tipo de salario...</option>
                       <option value="Integral">Integral</option>
                       <option value="Ordinario">Ordinario</option>
                     </select>

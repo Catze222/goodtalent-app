@@ -14,6 +14,7 @@ export interface Contract {
   segundo_apellido?: string | null
   tipo_identificacion: string
   numero_identificacion: string
+  fecha_expedicion_documento?: string | null
   fecha_nacimiento: string
   genero: string
   celular?: string | null
