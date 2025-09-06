@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { X, Camera, Upload, Loader2, CheckCircle, AlertCircle, Edit3, Save, RotateCcw } from 'lucide-react'
 import FileUploader from './FileUploader'
+import ConfidencePercentage from './ConfidencePercentage'
 
 import { useOCRExtraction } from '../../hooks/useOCRExtraction'
 
@@ -50,9 +51,9 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
     fecha_nacimiento: ''
   })
   const [confidence, setConfidence] = useState<any>({})
+  const [numericConfidence, setNumericConfidence] = useState<Record<string, number>>({})
 
-
-  const { loading, result, error, extractData, reset } = useOCRExtraction()
+  const { loading, result, error, extractData, reset, getNumericConfidence } = useOCRExtraction()
 
   // Resetear estado cuando se abre el modal
   useEffect(() => {
@@ -70,6 +71,7 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
         fecha_nacimiento: ''
       })
       setConfidence({})
+      setNumericConfidence({})
 
       reset()
     }
@@ -79,9 +81,7 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
   useEffect(() => {
     if (result?.success) {
       const formFields = {
-        tipo_identificacion: result.fields.numero_cedula ? (
-          result.fields.numero_cedula.length <= 10 ? 'CC' : 'CE'
-        ) : '',
+        tipo_identificacion: result.fields.tipo_identificacion || '',
         numero_identificacion: result.fields.numero_cedula || '',
         fecha_expedicion_documento: result.fields.fecha_expedicion_documento || '',
         primer_nombre: result.fields.primer_nombre || '',
@@ -92,7 +92,7 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
       }
 
       const confidenceData = {
-        tipo_identificacion: result.confidence.numero_cedula,
+        tipo_identificacion: result.confidence.tipo_identificacion || 'alto',
         numero_identificacion: result.confidence.numero_cedula,
         fecha_expedicion_documento: result.confidence.fecha_expedicion_documento,
         primer_nombre: result.confidence.primer_nombre,
@@ -100,6 +100,12 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
         primer_apellido: result.confidence.primer_apellido,
         segundo_apellido: result.confidence.segundo_apellido,
         fecha_nacimiento: result.confidence.fecha_nacimiento
+      }
+
+      // Obtener porcentajes numéricos si están disponibles
+      const numericConfidenceData = getNumericConfidence()
+      if (numericConfidenceData) {
+        setNumericConfidence(numericConfidenceData)
       }
 
       setEditableData(formFields)
@@ -320,9 +326,18 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tipo de Identificación
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Tipo de Identificación
+                    </label>
+                    {numericConfidence.tipo_identificacion && (
+                      <ConfidencePercentage 
+                        percentage={numericConfidence.tipo_identificacion} 
+                        compact={true}
+                        showIcon={false}
+                      />
+                    )}
+                  </div>
                   <select
                     value={editableData.tipo_identificacion}
                     onChange={(e) => handleInputChange('tipo_identificacion', e.target.value)}
@@ -338,9 +353,18 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Número de Identificación
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Número de Identificación
+                    </label>
+                    {numericConfidence.numero_identificacion && (
+                      <ConfidencePercentage 
+                        percentage={numericConfidence.numero_identificacion} 
+                        compact={true}
+                        showIcon={false}
+                      />
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={editableData.numero_identificacion}
@@ -351,9 +375,18 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Fecha de Expedición
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Fecha de Expedición
+                    </label>
+                    {numericConfidence.fecha_expedicion_documento && (
+                      <ConfidencePercentage 
+                        percentage={numericConfidence.fecha_expedicion_documento} 
+                        compact={true}
+                        showIcon={false}
+                      />
+                    )}
+                  </div>
                   <input
                     type="date"
                     value={editableData.fecha_expedicion_documento}
@@ -363,9 +396,18 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Primer Nombre
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Primer Nombre
+                    </label>
+                    {numericConfidence.primer_nombre && (
+                      <ConfidencePercentage 
+                        percentage={numericConfidence.primer_nombre} 
+                        compact={true}
+                        showIcon={false}
+                      />
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={editableData.primer_nombre}
@@ -376,9 +418,18 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Segundo Nombre
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Segundo Nombre
+                    </label>
+                    {numericConfidence.segundo_nombre && (
+                      <ConfidencePercentage 
+                        percentage={numericConfidence.segundo_nombre} 
+                        compact={true}
+                        showIcon={false}
+                      />
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={editableData.segundo_nombre}
@@ -389,9 +440,18 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Primer Apellido
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Primer Apellido
+                    </label>
+                    {numericConfidence.primer_apellido && (
+                      <ConfidencePercentage 
+                        percentage={numericConfidence.primer_apellido} 
+                        compact={true}
+                        showIcon={false}
+                      />
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={editableData.primer_apellido}
@@ -402,9 +462,18 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Segundo Apellido
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Segundo Apellido
+                    </label>
+                    {numericConfidence.segundo_apellido && (
+                      <ConfidencePercentage 
+                        percentage={numericConfidence.segundo_apellido} 
+                        compact={true}
+                        showIcon={false}
+                      />
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={editableData.segundo_apellido}
@@ -415,9 +484,18 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Fecha de Nacimiento
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Fecha de Nacimiento
+                    </label>
+                    {numericConfidence.fecha_nacimiento && (
+                      <ConfidencePercentage 
+                        percentage={numericConfidence.fecha_nacimiento} 
+                        compact={true}
+                        showIcon={false}
+                      />
+                    )}
+                  </div>
                   <input
                     type="date"
                     value={editableData.fecha_nacimiento}

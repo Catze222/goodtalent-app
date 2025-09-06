@@ -20,6 +20,7 @@ export interface ExtractedFields {
   segundo_apellido: string | null
   fecha_nacimiento: string | null
   fecha_expedicion_documento: string | null
+  tipo_identificacion: string | null
 }
 
 export interface FieldConfidence {
@@ -30,12 +31,25 @@ export interface FieldConfidence {
   segundo_apellido: 'alto' | 'medio' | 'bajo'
   fecha_nacimiento: 'alto' | 'medio' | 'bajo'
   fecha_expedicion_documento: 'alto' | 'medio' | 'bajo'
+  tipo_identificacion: 'alto' | 'medio' | 'bajo'
+}
+
+export interface NumericConfidence {
+  numero_cedula: number
+  primer_nombre: number
+  segundo_nombre: number
+  primer_apellido: number
+  segundo_apellido: number
+  fecha_nacimiento: number
+  fecha_expedicion_documento: number
+  tipo_identificacion: number
 }
 
 export interface OCRResult {
   success: boolean
   fields: ExtractedFields
   confidence: FieldConfidence
+  numericConfidence?: NumericConfidence  // Porcentajes 0-100 de Gemini
   error?: string
   debug?: {
     detectedText: string
@@ -140,10 +154,8 @@ export function useOCRExtraction() {
     const fields = state.result.fields
     
     return {
-      // Determinar tipo de identificación basado en el número
-      tipo_identificacion: fields.numero_cedula ? (
-        fields.numero_cedula.length <= 10 ? 'CC' : 'CE'
-      ) : '',
+      // Usar el tipo de identificación que detectó Gemini
+      tipo_identificacion: state.result.fields.tipo_identificacion || '',
       
       numero_identificacion: fields.numero_cedula || '',
       fecha_expedicion_documento: fields.fecha_expedicion_documento || '',
@@ -162,7 +174,7 @@ export function useOCRExtraction() {
     if (!state.result?.success) return null
 
     return {
-      tipo_identificacion: state.result.confidence.numero_cedula, // Basado en el número
+      tipo_identificacion: state.result.confidence.tipo_identificacion || 'alto',
       numero_identificacion: state.result.confidence.numero_cedula,
       fecha_expedicion_documento: state.result.confidence.fecha_expedicion_documento,
       primer_nombre: state.result.confidence.primer_nombre,
@@ -170,6 +182,24 @@ export function useOCRExtraction() {
       primer_apellido: state.result.confidence.primer_apellido,
       segundo_apellido: state.result.confidence.segundo_apellido,
       fecha_nacimiento: state.result.confidence.fecha_nacimiento
+    }
+  }, [state.result])
+
+  /**
+   * Obtiene los porcentajes numéricos de confianza (0-100)
+   */
+  const getNumericConfidence = useCallback(() => {
+    if (!state.result?.success || !state.result.numericConfidence) return null
+
+    return {
+      tipo_identificacion: state.result.numericConfidence.tipo_identificacion || 95,
+      numero_identificacion: state.result.numericConfidence.numero_cedula,
+      fecha_expedicion_documento: state.result.numericConfidence.fecha_expedicion_documento,
+      primer_nombre: state.result.numericConfidence.primer_nombre,
+      segundo_nombre: state.result.numericConfidence.segundo_nombre,
+      primer_apellido: state.result.numericConfidence.primer_apellido,
+      segundo_apellido: state.result.numericConfidence.segundo_apellido,
+      fecha_nacimiento: state.result.numericConfidence.fecha_nacimiento
     }
   }, [state.result])
 
@@ -185,6 +215,7 @@ export function useOCRExtraction() {
     
     // Helpers
     getFormFields,
-    getFormConfidence
+    getFormConfidence,
+    getNumericConfidence
   }
 }

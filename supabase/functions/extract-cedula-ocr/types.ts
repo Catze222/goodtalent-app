@@ -15,6 +15,7 @@ export interface ExtractedFields {
   segundo_apellido: string | null
   fecha_nacimiento: string | null // Formato YYYY-MM-DD
   fecha_expedicion_documento: string | null // Formato YYYY-MM-DD
+  tipo_identificacion: string | null // CC, CE, etc.
 }
 
 // Niveles de confianza para cada campo
@@ -26,6 +27,19 @@ export interface FieldConfidence {
   segundo_apellido: ConfidenceLevel
   fecha_nacimiento: ConfidenceLevel
   fecha_expedicion_documento: ConfidenceLevel
+  tipo_identificacion: ConfidenceLevel
+}
+
+// Confianza numérica (0-100) para cada campo
+export interface NumericConfidence {
+  numero_cedula: number
+  primer_nombre: number
+  segundo_nombre: number
+  primer_apellido: number
+  segundo_apellido: number
+  fecha_nacimiento: number
+  fecha_expedicion_documento: number
+  tipo_identificacion: number
 }
 
 // Respuesta completa de la Edge Function
@@ -33,11 +47,14 @@ export interface OCRResponse {
   success: boolean
   fields: ExtractedFields
   confidence: FieldConfidence
+  numericConfidence?: NumericConfidence  // Porcentajes 0-100 de Gemini
   error?: string
   debug?: {
     detectedText: string
     processingTime: number
     documentType: 'frente' | 'dorso' | 'completo' | 'desconocido'
+    filesProcessed?: number
+    combinedResults?: boolean
   }
 }
 
@@ -67,4 +84,14 @@ export interface ParseResult {
 export interface ParserConfig {
   strictMode: boolean // Si es true, requiere mayor precisión
   debugMode: boolean // Si es true, incluye información de debug
+}
+
+// Respuesta interna de Gemini
+export interface GeminiResponse {
+  success: boolean
+  fields: ExtractedFields
+  confidence: FieldConfidence
+  documentType: 'CC' | 'CE' | 'desconocido'
+  processingTime: number
+  numericConfidence?: NumericConfidence
 }

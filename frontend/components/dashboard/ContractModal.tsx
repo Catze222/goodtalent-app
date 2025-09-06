@@ -97,6 +97,9 @@ export default function ContractModal({
 
   // Manejar datos extraídos por OCR
   const handleOCRDataExtracted = (extractedFields: any, confidence: any) => {
+    console.log('📄 Datos extraídos por OCR:', extractedFields)
+    console.log('📊 Confianza de campos:', confidence)
+    
     // Actualizar formData con los campos extraídos
     setFormData(prev => ({
       ...prev,
@@ -116,6 +119,11 @@ export default function ContractModal({
       })
       return newErrors
     })
+
+    // Mostrar mensaje de éxito con tipo de documento detectado
+    const documentType = extractedFields.tipo_identificacion === 'CC' ? 'Cédula de Ciudadanía' : 
+                        extractedFields.tipo_identificacion === 'CE' ? 'Cédula de Extranjería' : 'documento'
+    console.log(`✅ ${documentType} procesada exitosamente con Gemini`)
   }
 
   // Helper para props de inputs con lógica de solo lectura

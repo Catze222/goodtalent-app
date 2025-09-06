@@ -1,13 +1,12 @@
 /**
  * Edge Function para extracción de datos de cédulas colombianas
- * Integra Google Vision API + Parser especializado
+ * Integra Gemini 1.5 Flash para OCR inteligente
  * GOOD Talent - 2025
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
-import { GoogleVisionClient } from './googleVision.ts'
-import { CedulaParser } from './cedulaParser.ts'
+import { GeminiClient } from './geminiClient.ts'
 import { OCRRequest, OCRResponse } from './types.ts'
 
 serve(async (req: Request) => {
@@ -41,10 +40,10 @@ serve(async (req: Request) => {
     
     // Verificar variables de entorno
     console.log('🔐 Verificando variables de entorno...')
-    const projectId = Deno.env.get('GOOGLE_CLOUD_PROJECT_ID')
-    const credentials = Deno.env.get('GOOGLE_APPLICATION_CREDENTIALS')
-    console.log('📋 GOOGLE_CLOUD_PROJECT_ID:', projectId ? '✅ Configurado' : '❌ Falta')
-    console.log('🔑 GOOGLE_APPLICATION_CREDENTIALS:', credentials ? '✅ Configurado' : '❌ Falta')
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
+    const geminiModel = Deno.env.get('GEMINI_MODEL')
+    console.log('📋 GEMINI_API_KEY:', geminiApiKey ? '✅ Configurado' : '❌ Falta')
+    console.log('🔑 GEMINI_MODEL:', geminiModel || 'gemini-1.5-flash (default)')
     
     // Parsear request
     let requestData: OCRRequest
@@ -147,112 +146,93 @@ serve(async (req: Request) => {
       }
     }
 
-    // Inicializar servicios
-    console.log('🔧 Inicializando servicios...')
+    // Inicializar cliente Gemini
+    console.log('🔧 Inicializando Gemini client...')
     try {
-      console.log('👁️ Creando GoogleVisionClient...')
-      const visionClient = new GoogleVisionClient()
-      console.log('✅ GoogleVisionClient creado exitosamente')
-      
-      console.log('🔍 Creando CedulaParser...')
-      const parser = new CedulaParser({ strictMode: false, debugMode: true })
-      console.log('✅ CedulaParser creado exitosamente')
+      console.log('🤖 Creando GeminiClient...')
+      const geminiClient = new GeminiClient()
+      console.log('✅ GeminiClient creado exitosamente')
 
-      // Procesar archivos
-      console.log('📁 Iniciando procesamiento de archivos...')
-      let combinedText = ''
-      let allResults: string[] = []
+      // Procesar archivos con Gemini
+      console.log('📁 Iniciando procesamiento con Gemini...')
+      console.log(`📊 Total de archivos recibidos: ${requestData.files.length}`)
       
-      for (let i = 0; i < requestData.files.length; i++) {
-        const file = requestData.files[i]
-        console.log(`📄 Procesando archivo ${i + 1}/${requestData.files.length}: ${file.name}`)
+      let finalResult: any
+
+      if (requestData.files.length === 1) {
+        // Una sola imagen: usar método legacy (rápido y probado)
+        const file = requestData.files[0]
+        console.log(`📄 Procesando archivo único: ${file.name}`)
         
-        try {
-        // Manejar PDFs - convertir primera página a imagen
-        if (file.type === 'application/pdf') {
-          console.log('📄 Archivo PDF detectado, procesando primera página...')
-          
-          try {
-            // Para PDFs, asumimos que el base64 ya está listo para Vision API
-            // Google Vision API puede procesar PDFs directamente
-            console.log('🔍 Enviando PDF a Google Vision API...')
-            const visionResult = await visionClient.processImage(file.data)
-            console.log(`📝 Texto extraído del PDF (${visionResult.text.length} caracteres):`, visionResult.text.substring(0, 200) + '...')
-            
-            combinedText += visionResult.text + '\n\n'
-            allResults.push(visionResult.text)
-            console.log(`✅ PDF ${file.name} procesado exitosamente`)
-            
-          } catch (pdfError) {
-            console.error(`❌ Error procesando PDF ${file.name}:`, pdfError)
-            return new Response(
-              JSON.stringify({ 
-                success: false, 
-                error: `Error procesando PDF ${file.name}: ${pdfError.message}` 
-              }),
-              { 
-                status: 500, 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-              }
-            )
-          }
-          
-          continue // Saltar al siguiente archivo
+        const geminiResult = await geminiClient.processImage(file.data, file.type)
+        
+        console.log(`📊 Resultado:`, {
+          success: geminiResult.success,
+          documentType: geminiResult.documentType,
+          fieldsFound: Object.values(geminiResult.fields).filter(v => v !== null).length
+        })
+        
+        if (!geminiResult.success) {
+          throw new Error('No se pudo procesar la imagen correctamente')
         }
-
-          // Procesar imagen con Google Vision
-          console.log(`🔍 Enviando a Google Vision API...`)
-          const visionResult = await visionClient.processImage(file.data)
-          console.log(`📝 Texto extraído (${visionResult.text.length} caracteres):`, visionResult.text.substring(0, 200) + '...')
-          
-          combinedText += visionResult.text + '\n\n'
-          allResults.push(visionResult.text)
-          console.log(`✅ Archivo ${file.name} procesado exitosamente`)
-          
-        } catch (error) {
-          console.error(`❌ Error procesando archivo ${file.name}:`, error)
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: `Error procesando archivo ${file.name}: ${error.message}` 
-          }),
-          { 
-            status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
+        
+        finalResult = geminiResult
+        console.log('✅ Archivo único procesado exitosamente')
+        
+      } else {
+        // Múltiples imágenes: usar nueva función optimizada (UNA SOLA LLAMADA)
+        console.log(`🚀 Procesando ${requestData.files.length} imágenes en una sola llamada a Gemini...`)
+        
+        const geminiResult = await geminiClient.processMultipleImages(requestData.files)
+        
+        console.log(`📊 Resultado combinado:`, {
+          success: geminiResult.success,
+          documentType: geminiResult.documentType,
+          fieldsFound: Object.values(geminiResult.fields).filter(v => v !== null).length
+        })
+        
+        if (!geminiResult.success) {
+          throw new Error('No se pudo procesar las imágenes correctamente')
+        }
+        
+        finalResult = geminiResult
+        console.log('✅ Múltiples imágenes procesadas exitosamente en una llamada')
       }
-    }
 
-      // Parsear texto combinado
-      console.log('🔍 Parseando texto combinado...')
-      console.log('📄 Texto total a parsear:', combinedText.length, 'caracteres')
-      
-      const parseResult = parser.parse(combinedText)
-      console.log('📊 Resultado del parsing:', {
-        documentType: parseResult.documentType,
-        fieldsFound: Object.keys(parseResult.fields).filter(key => parseResult.fields[key]).length,
-        fields: parseResult.fields
-      })
-      
-      const processingTime = Date.now() - startTime
-      console.log('⏱️ Tiempo total de procesamiento:', processingTime, 'ms')
+      const totalProcessingTime = Date.now() - startTime
+      console.log('⏱️ Tiempo total de procesamiento:', totalProcessingTime, 'ms')
 
-      // Construir respuesta
+      // Construir respuesta en formato compatible
       console.log('📤 Construyendo respuesta final...')
       const response: OCRResponse = {
         success: true,
-        fields: parseResult.fields,
-        confidence: parseResult.confidence,
+        fields: {
+          ...finalResult.fields,
+          tipo_identificacion: finalResult.documentType  // Agregar el tipo de documento
+        },
+        confidence: {
+          ...finalResult.confidence,
+          tipo_identificacion: 'alto'  // Gemini es muy bueno identificando tipo de documento
+        },
+        numericConfidence: finalResult.numericConfidence ? {
+          ...finalResult.numericConfidence,
+          tipo_identificacion: 95  // Alto porcentaje para tipo de documento
+        } : undefined,
         debug: {
-          detectedText: combinedText,
-          processingTime,
-          documentType: parseResult.documentType
+          detectedText: `Procesado con Gemini 1.5 Flash - ${requestData.files.length} archivo(s) - Tipo: ${finalResult.documentType}`,
+          processingTime: totalProcessingTime,
+          documentType: finalResult.documentType === 'CC' ? 'frente' : 
+                       finalResult.documentType === 'CE' ? 'frente' : 'desconocido',
+          filesProcessed: requestData.files.length,
+          combinedResults: requestData.files.length > 1
         }
       }
 
       console.log('✅ Respuesta construida exitosamente')
-      console.log('📊 Respuesta final:', JSON.stringify(response, null, 2))
+      console.log('📊 Campos extraídos:', Object.entries(finalResult.fields)
+        .filter(([_, value]) => value !== null)
+        .map(([key, value]) => `${key}: ${value}`)
+      )
 
       return new Response(
         JSON.stringify(response),
@@ -263,11 +243,11 @@ serve(async (req: Request) => {
       )
 
     } catch (serviceError) {
-      console.error('❌ Error en servicios:', serviceError)
+      console.error('❌ Error en Gemini:', serviceError)
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Error en servicios: ${serviceError.message}`,
+          error: `Error en Gemini: ${serviceError.message}`,
           details: serviceError.stack
         }),
         { 
@@ -305,11 +285,6 @@ const formData = {
       name: "cedula_frente.jpg",
       data: "base64string...",
       type: "image/jpeg"
-    },
-    {
-      name: "cedula_dorso.jpg", 
-      data: "base64string...",
-      type: "image/jpeg"
     }
   ]
 }
@@ -321,6 +296,7 @@ const response = await fetch('/functions/v1/extract-cedula-ocr', {
 })
 
 const result = await response.json()
-// result.fields contiene los datos extraídos
+// result.fields contiene los datos extraídos por Gemini
 // result.confidence contiene los niveles de confianza
+// Gemini detecta automáticamente si es CC o CE
 */
