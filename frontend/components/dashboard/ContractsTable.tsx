@@ -25,6 +25,7 @@ import {
   calculateTotalRemuneration,
   formatCurrency 
 } from '../../types/contract'
+import { formatDateColombia } from '../../utils/dateUtils'
 import { ContractStatusCompact } from '../ui/ContractStatusBadges'
 import ContractApprovalButton from '../ui/ContractApprovalButton'
 import DeleteContractModal from '../ui/DeleteContractModal'
@@ -99,15 +100,8 @@ export default function ContractsTable({
     type: 'warning'
   })
 
-  // Formatear fechas
-  const formatDate = (dateString?: string | null) => {
-    if (!dateString) return '-'
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit'
-    })
-  }
+  // Usar formateo de fecha correcto para Colombia (evita problema de zona horaria)
+  const formatDate = formatDateColombia
 
   // Formatear moneda con puntos como separadores
   const formatCurrencyLocal = (amount?: number | null) => {
@@ -575,7 +569,7 @@ export default function ContractsTable({
         <div style={{ minWidth: `${calculateMinWidth()}px` }}>
           
           {/* Header de tabla */}
-          <div className="grid gap-2 p-4 bg-gray-50 border-b border-gray-200 font-medium text-gray-700 text-sm" style={{gridTemplateColumns: generateGridColumns()}}>
+          <div className="grid gap-2 p-4 bg-gray-50 border-b border-gray-200 font-medium text-gray-700 text-base" style={{gridTemplateColumns: generateGridColumns()}}>
             
             {/* Acciones al principio */}
             <div>Acciones</div>
@@ -590,7 +584,7 @@ export default function ContractsTable({
             
             {/* Todos los campos de onboarding (12 campos) con labels escritos */}
             {onboardingFields.map(field => (
-              <div key={field.key} className="text-center text-xs">
+              <div key={field.key} className="text-center text-sm">
                 <div className="break-words leading-tight font-medium">{field.label}</div>
               </div>
             ))}
@@ -679,38 +673,38 @@ export default function ContractsTable({
 
                     {/* Empleado */}
                     <div>
-                      <div className="font-medium text-gray-900 text-sm">{fullName}</div>
-                      <div className="text-xs text-gray-500 mb-1">{contract.tipo_identificacion} {contract.numero_identificacion}</div>
+                      <div className="font-medium text-gray-900 text-base">{fullName}</div>
+                      <div className="text-sm text-gray-500 mb-1">{contract.tipo_identificacion} {contract.numero_identificacion}</div>
                       <ContractStatusCompact contract={contract} />
                     </div>
 
                     {/* Empresa */}
                     <div>
-                      <span className={`inline-block px-2 py-1 text-xs rounded-full font-medium ${
+                      <span className={`inline-block px-2 py-1 text-sm rounded-full font-medium ${
                         contract.empresa_interna === 'Good' 
                           ? 'bg-[#87E0E0] text-[#004C4C]' 
                           : 'bg-[#5FD3D2] text-[#004C4C]'
                       }`}>
                         {contract.empresa_interna}
                       </span>
-                      <div className="text-xs text-gray-500 mt-1 break-words leading-tight">
+                      <div className="text-sm text-gray-500 mt-1 break-words leading-tight">
                         {contract.company?.name || 'Sin empresa'}
                       </div>
                     </div>
 
                     {/* Contrato */}
                     <div>
-                      <div className="text-sm font-medium truncate">{contract.numero_contrato_helisa}</div>
-                      <div className="text-xs text-gray-500">{contract.cargo || '-'}</div>
+                      <div className="text-base font-medium truncate">{contract.numero_contrato_helisa}</div>
+                      <div className="text-sm text-gray-500">{contract.cargo || '-'}</div>
                     </div>
 
                     {/* Fecha ingreso */}
-                    <div className="text-sm">
+                    <div className="text-base">
                       {formatDate(contract.fecha_ingreso)}
                     </div>
 
                     {/* Fecha terminación */}
-                    <div className="text-sm">
+                    <div className="text-base">
                       {contract.fecha_fin ? (
                         <span className="text-orange-600 font-medium">
                           {formatDate(contract.fecha_fin)}
@@ -721,11 +715,11 @@ export default function ContractsTable({
                     </div>
 
                     {/* Total Remuneración */}
-                    <div className="text-sm">
+                    <div className="text-base">
                       <div className="font-medium text-green-700">
                         {formatCurrencyLocal(calculateTotalRemuneration(contract))}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-sm text-gray-500">
                         Total remuneración
                       </div>
                     </div>

@@ -97,6 +97,7 @@
 | `news` | `view`, `create`, `edit`, `delete` | Novedades del sistema |
 | `dashboard` | `view` | Acceso al dashboard |
 | `reports` | `view`, `create`, `export` | Reportes y exportaciones |
+| `tablas_auxiliares` | `view`, `create`, `edit`, `delete` | Gestión de tablas auxiliares administrativas |
 
 **NOTA:** El módulo `employees` fue removido del sistema. Todos los permisos relacionados con empleados han sido eliminados.
 
@@ -371,4 +372,123 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 
 ---
 
-*Sistema de permisos GOOD Talent v2.1 - Onboarding Simplificado*
+## 🗂️ Tablas Auxiliares Administrativas
+
+### 5. `ciudades` – Ciudades Principales
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440002` |
+| `nombre` | TEXT | Nombre de la ciudad | `Bogotá` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+
+**Restricciones:**
+- `UNIQUE(nombre)` - Nombre único por ciudad
+- Validación de nombre no vacío
+
+### 6. `cajas_compensacion` – Cajas de Compensación Familiar
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440003` |
+| `nombre` | TEXT | Nombre de la caja | `Colsubsidio` |
+| `ciudad_id` | UUID (FK) | Ciudad donde opera | `ciudad-uuid` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+
+**Relaciones:**
+- `ciudad_id` → `ciudades(id)` ON DELETE CASCADE
+
+**Restricciones:**
+- `UNIQUE(nombre, ciudad_id)` - Una caja por nombre y ciudad
+- Validación de nombre no vacío
+
+### 7. `arls` – Administradoras de Riesgos Laborales
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440004` |
+| `nombre` | TEXT | Nombre de la ARL | `ARL SURA` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+
+**Restricciones:**
+- `UNIQUE(nombre)` - Nombre único por ARL
+- Validación de nombre no vacío
+
+### 8. `fondos_cesantias` – Fondos de Cesantías
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440005` |
+| `nombre` | TEXT | Nombre del fondo | `Porvenir` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+
+**Restricciones:**
+- `UNIQUE(nombre)` - Nombre único por fondo
+- Validación de nombre no vacío
+
+### 9. `fondos_pension` – Fondos de Pensión
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440006` |
+| `nombre` | TEXT | Nombre del fondo | `Protección` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+
+**Restricciones:**
+- `UNIQUE(nombre)` - Nombre único por fondo
+- Validación de nombre no vacío
+
+### 10. `eps` – Entidades Promotoras de Salud
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440007` |
+| `nombre` | TEXT | Nombre de la EPS | `EPS Sura` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+
+**Restricciones:**
+- `UNIQUE(nombre)` - Nombre único por EPS
+- Validación de nombre no vacío
+
+## 🔐 Seguridad RLS - Tablas Auxiliares
+
+**Todas las tablas auxiliares tienen:**
+- **Ver:** `has_permission(auth.uid(), 'tablas_auxiliares', 'view')`
+- **Crear:** `has_permission(auth.uid(), 'tablas_auxiliares', 'create')`
+- **Editar:** `has_permission(auth.uid(), 'tablas_auxiliares', 'edit')`
+- **Eliminar:** `has_permission(auth.uid(), 'tablas_auxiliares', 'delete')`
+
+**Triggers:**
+- `update_auxiliary_tables_updated_at()` - Actualiza automáticamente `updated_at` y `updated_by`
+
+## 📊 Datos Precargados
+
+Las tablas auxiliares incluyen datos iniciales del sistema colombiano:
+- **29 ciudades principales**
+- **45 cajas de compensación** (relacionadas con ciudades)
+- **8 ARLs principales**
+- **5 fondos de cesantías**
+- **5 fondos de pensión**
+- **28 EPS disponibles**
+
+---
+
+*Sistema de permisos GOOD Talent v2.2 - Con Tablas Auxiliares*

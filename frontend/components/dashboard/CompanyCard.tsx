@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Edit3, Archive, RotateCcw, Mail, Phone, User, Calendar, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
+import { formatDateColombiaLong } from '../../utils/dateUtils'
 
 interface Company {
   id: string
@@ -46,13 +47,8 @@ export default function CompanyCard({
 
   const isArchived = !!company.archived_at
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
+  // Usar formateo de fecha correcto para Colombia (evita problema de zona horaria)
+  const formatDate = formatDateColombiaLong
 
   const handleStatusToggle = async () => {
     if (!canUpdate) return
@@ -161,21 +157,21 @@ export default function CompanyCard({
         {/* Company Header - banda a todo el ancho de la tarjeta */}
         <div className="mb-4">
           <div className="-mx-6 -mt-6 rounded-t-2xl bg-[#F1F5F9] border-b border-gray-200 px-6 py-3 sm:py-4 pr-20">
-            <h3 className="text-sm sm:text-base md:text-lg leading-tight font-bold text-[#004C4C] truncate">
+            <h3 className="text-base sm:text-lg md:text-xl leading-tight font-bold text-[#004C4C] truncate">
               {company.name}
             </h3>
           </div>
-          <p className="mt-2 text-xs text-gray-500 pr-16">NIT: {company.tax_id}</p>
+          <p className="mt-2 text-sm text-gray-500 pr-16">NIT: {company.tax_id}</p>
         </div>
 
         {/* Contact Information */}
         <div className="space-y-3 mb-6">
-          <div className="flex items-center space-x-3 text-sm">
+          <div className="flex items-center space-x-3 text-base">
             <User className="h-4 w-4 text-gray-400" />
             <span className="text-gray-700 font-medium">{company.accounts_contact_name}</span>
           </div>
           
-          <div className="flex items-center space-x-3 text-sm">
+          <div className="flex items-center space-x-3 text-base">
             <Mail className="h-4 w-4 text-gray-400" />
             <a 
               href={`mailto:${company.accounts_contact_email}`}
@@ -185,7 +181,7 @@ export default function CompanyCard({
             </a>
           </div>
           
-          <div className="flex items-center space-x-3 text-sm">
+          <div className="flex items-center space-x-3 text-base">
             <Phone className="h-4 w-4 text-gray-400" />
             <a 
               href={`tel:${company.accounts_contact_phone}`}
@@ -198,7 +194,7 @@ export default function CompanyCard({
 
         {/* Metadata (altura consistente y usuarios creador/editor) */}
         <div className="border-t border-gray-100 pt-4 mb-4">
-          <div className="flex flex-col space-y-1 text-xs text-gray-500 min-h-[44px]">
+          <div className="flex flex-col space-y-1 text-sm text-gray-500 min-h-[44px]">
             <div className="flex items-center space-x-2">
               <Calendar className="h-3 w-3" />
               <span>Creada: {formatDate(company.created_at)}</span>
@@ -228,7 +224,7 @@ export default function CompanyCard({
           {canUpdate && !isArchived && (
             <button
               onClick={() => onEdit(company)}
-              className="flex items-center space-x-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm"
+              className="flex items-center space-x-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-base"
             >
               <Edit3 className="h-4 w-4" />
               <span>Editar</span>
@@ -240,7 +236,7 @@ export default function CompanyCard({
             <button
               onClick={handleStatusToggle}
               disabled={loading === 'status'}
-              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors text-sm ${
+              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors text-base ${
                 company.status
                   ? 'bg-orange-50 text-orange-700 hover:bg-orange-100'
                   : 'bg-green-50 text-green-700 hover:bg-green-100'
@@ -259,7 +255,7 @@ export default function CompanyCard({
           {canDelete && !isArchived && (
             <button
               onClick={() => setShowConfirm('archive')}
-              className="flex items-center space-x-2 px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-sm"
+              className="flex items-center space-x-2 px-3 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-base"
             >
               <Archive className="h-4 w-4" />
               <span>Archivar</span>
@@ -271,7 +267,7 @@ export default function CompanyCard({
             <button
               onClick={handleUnarchive}
               disabled={loading === 'unarchive'}
-              className="flex items-center space-x-2 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-sm"
+              className="flex items-center space-x-2 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-base"
             >
               {loading === 'unarchive' ? (
                 <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
@@ -293,8 +289,8 @@ export default function CompanyCard({
                 <AlertTriangle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Confirmar Archivado</h3>
-                <p className="text-sm text-gray-600">Esta acción no se puede deshacer fácilmente</p>
+                <h3 className="text-xl font-bold text-gray-900">Confirmar Archivado</h3>
+                <p className="text-base text-gray-600">Esta acción no se puede deshacer fácilmente</p>
               </div>
             </div>
             

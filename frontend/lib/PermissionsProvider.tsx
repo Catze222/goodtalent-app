@@ -33,6 +33,7 @@ interface PermissionsContextType {
   // Funciones de verificación
   hasPermission: (tableName: string, action: string) => boolean
   canManageUsers: () => boolean
+  canManageAuxTables: () => boolean
   isSuperAdmin: () => boolean
   
   // Funciones de control
@@ -252,6 +253,10 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
            hasPermission('user_permissions', 'view')
   }, [hasPermission])
 
+  const canManageAuxTables = useCallback((): boolean => {
+    return hasPermission('tablas_auxiliares', 'view')
+  }, [hasPermission])
+
   const isSuperAdmin = useCallback((): boolean => {
     return hasPermission('user_permissions', 'create') && 
            hasPermission('user_permissions', 'delete')
@@ -291,6 +296,7 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
     loading,
     hasPermission,
     canManageUsers,
+    canManageAuxTables,
     isSuperAdmin,
     refreshPermissions,
     forceRefresh,

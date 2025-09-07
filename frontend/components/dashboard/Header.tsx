@@ -11,7 +11,8 @@ import {
   User as UserIcon,
   ChevronDown,
   Users,
-  Settings
+  Settings,
+  Database
 } from 'lucide-react'
 
 /**
@@ -21,7 +22,7 @@ export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
-  const { user, canManageUsers, logout } = usePermissions()
+  const { user, canManageUsers, canManageAuxTables, logout } = usePermissions()
 
   // Cerrar menú al hacer clic fuera
   useEffect(() => {
@@ -61,6 +62,11 @@ export default function Header() {
   const handleUserManagement = () => {
     setShowUserMenu(false)
     router.push('/dashboard/gestion-usuarios')
+  }
+
+  const handleAuxiliaryTables = () => {
+    setShowUserMenu(false)
+    router.push('/dashboard/tablas-auxiliares')
   }
 
   return (
@@ -128,15 +134,28 @@ export default function Header() {
                 </div>
                 
                 <div className="py-2">
-                  {canManageUsers() && (
+                  {(canManageUsers() || canManageAuxTables()) && (
                     <>
-                      <button
-                        onClick={handleUserManagement}
-                        className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
-                      >
-                        <Users className="h-4 w-4 mr-3" />
-                        Gestión de usuarios
-                      </button>
+                      {canManageUsers() && (
+                        <button
+                          onClick={handleUserManagement}
+                          className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
+                        >
+                          <Users className="h-4 w-4 mr-3" />
+                          Gestión de usuarios
+                        </button>
+                      )}
+                      
+                      {canManageAuxTables() && (
+                        <button
+                          onClick={handleAuxiliaryTables}
+                          className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-200"
+                        >
+                          <Database className="h-4 w-4 mr-3" />
+                          Tablas auxiliares
+                        </button>
+                      )}
+                      
                       <div className="border-t border-gray-100 my-2"></div>
                     </>
                   )}

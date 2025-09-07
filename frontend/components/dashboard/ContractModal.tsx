@@ -568,6 +568,7 @@ export default function ContractModal({
         segundo_apellido: formData.segundo_apellido || null,
         tipo_identificacion: formData.tipo_identificacion,
         numero_identificacion: formData.numero_identificacion,
+        fecha_expedicion_documento: formData.fecha_expedicion_documento || null,
         fecha_nacimiento: formData.fecha_nacimiento,
         celular: formData.celular || null,
         email: formData.email || null,

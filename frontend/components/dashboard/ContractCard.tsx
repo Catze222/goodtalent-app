@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { Contract, getContractStatusConfig } from '../../types/contract'
+import { formatDateColombia } from '../../utils/dateUtils'
 import { ContractStatusCompact } from '../ui/ContractStatusBadges'
 import ContractApprovalButton from '../ui/ContractApprovalButton'
 
@@ -44,15 +45,8 @@ export default function ContractCard({
   const [updatingOnboarding, setUpdatingOnboarding] = useState(false)
   const statusConfig = getContractStatusConfig(contract)
 
-  // Formatear fechas
-  const formatDate = (dateString?: string | null) => {
-    if (!dateString) return '-'
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  }
+  // Usar formateo de fecha correcto para Colombia (evita problema de zona horaria)
+  const formatDate = formatDateColombia
 
   // Formatear moneda con puntos como separadores
   const formatCurrency = (amount?: number | null) => {
