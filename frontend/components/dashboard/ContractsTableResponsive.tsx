@@ -134,18 +134,16 @@ export default function ContractsTableResponsive({
       render: (value: string) => value ? formatDateColombia(value) : 'Indefinido'
     },
     {
-      key: 'estado_aprobacion',
+      key: 'status_aprobacion',
       label: 'Estado',
       sortable: false,
       mobileShow: true,
       render: (value: string, record: Contract) => (
         <div className="space-y-1">
           <ContractStatusCompact 
-            aprobacion={value}
-            vigencia={record.estado_vigencia}
-            onboarding={record.estado_onboarding}
+            contract={record}
           />
-          {canApprove && value === 'pendiente' && (
+          {canApprove && value === 'borrador' && (
             <ContractApprovalButton
               contract={record}
               onApprovalChange={onApprovalChange}
@@ -200,11 +198,11 @@ export default function ContractsTableResponsive({
 
   // Función para generar badge móvil
   const getMobileBadge = (contract: Contract) => {
-    const statusConfig = getStatusAprobacionConfig(contract.estado_aprobacion)
+    const statusConfig = getStatusAprobacionConfig(contract.status_aprobacion || 'aprobado')
     return (
       <div className="flex items-center space-x-1">
-        <div className={`w-2 h-2 rounded-full ${statusConfig.bgColor}`}></div>
-        <span className={`text-xs font-medium ${statusConfig.textColor}`}>
+        <div className={`w-2 h-2 rounded-full bg-green-500`}></div>
+        <span className={`text-xs font-medium text-green-600`}>
           {statusConfig.label}
         </span>
       </div>
