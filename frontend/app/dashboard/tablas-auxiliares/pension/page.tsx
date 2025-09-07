@@ -336,7 +336,7 @@ export default function PensionPage() {
 
       {/* Toast */}
       <Toast
-        show={toast.show}
+        open={toast.show}
         message={toast.message}
         type={toast.type}
         onClose={() => setToast({ ...toast, show: false })}
