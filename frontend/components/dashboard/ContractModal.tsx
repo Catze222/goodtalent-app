@@ -730,7 +730,7 @@ export default function ContractModal({
 
             {/* Tab 1: Información Personal */}
             {currentTab === 0 && (
-              <div className="space-y-4">
+              <div className="space-y-3 lg:space-y-4">
                 {/* Botón OCR - Solo mostrar en modo creación */}
                 {mode === 'create' && (
                   <div className="mb-4 flex justify-end">
@@ -741,7 +741,7 @@ export default function ContractModal({
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {/* Primero: Tipo de documento y número */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -790,7 +790,7 @@ export default function ContractModal({
                   </div>
 
                   {/* Separador visual */}
-                  <div className="md:col-span-2">
+                  <div className="col-span-1 lg:col-span-2">
                     <hr className="border-gray-200 my-4" />
                     <h4 className="text-md font-medium text-gray-800 mb-4">Información Personal</h4>
                   </div>
@@ -870,7 +870,7 @@ export default function ContractModal({
 
 
                   {/* Separador visual */}
-                  <div className="col-span-2">
+                  <div className="col-span-1 lg:col-span-2">
                     <hr className="border-gray-200 my-3" />
                     <h4 className="text-sm font-medium text-gray-800 mb-3">Información de Contacto</h4>
                   </div>
