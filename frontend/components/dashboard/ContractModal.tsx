@@ -665,21 +665,18 @@ export default function ContractModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-auto my-0 flex flex-col h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] sm:h-auto sm:max-h-[calc(100vh-4rem)]">
         
         {/* Header con stepper */}
-        <div className="bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white p-3">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex-1">
-              <h2 className="text-2xl font-bold">
+              <h2 className="text-lg font-bold">
                 {mode === 'create' ? 'Nuevo Contrato' : isReadOnly ? 'Ver Contrato' : 'Editar Contrato'}
               </h2>
-              <p className="text-[#87E0E0] text-sm">
-                {mode === 'create' ? 'Crear contrato laboral completo' : isReadOnly ? 'Información detallada del contrato' : 'Modificar información del contrato'}
-              </p>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 hover:bg-[#0A6A6A] rounded-full flex items-center justify-center transition-colors"
+              className="w-6 h-6 hover:bg-[#0A6A6A] rounded-full flex items-center justify-center transition-colors"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
 
@@ -690,7 +687,7 @@ export default function ContractModal({
                 <div className="flex items-center">
                   <button
                     onClick={() => goToTab(index)}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 ${
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 ${
                       currentTab === index
                         ? 'bg-[#87E0E0] text-[#004C4C] shadow-lg'
                         : currentTab > index
@@ -703,9 +700,9 @@ export default function ContractModal({
                   </button>
                   <button
                     onClick={() => goToTab(index)}
-                    className="ml-3 hidden sm:block"
+                    className="ml-2 hidden sm:block"
                   >
-                    <p className={`text-sm font-medium transition-colors hover:text-[#87E0E0] ${
+                    <p className={`text-xs font-medium transition-colors hover:text-[#87E0E0] ${
                       currentTab >= index ? 'text-[#87E0E0]' : 'text-[#58BFC2]'
                     }`}>
                       {tab.name}
@@ -722,7 +719,7 @@ export default function ContractModal({
 
         {/* Content */}
         <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto">
-          <div className="p-6">
+          <div className="p-4">
             
             {/* Error general */}
             {errors.general && (
@@ -733,7 +730,7 @@ export default function ContractModal({
 
             {/* Tab 1: Información Personal */}
             {currentTab === 0 && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Botón OCR - Solo mostrar en modo creación */}
                 {mode === 'create' && (
                   <div className="mb-4 flex justify-end">
@@ -744,10 +741,10 @@ export default function ContractModal({
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Primero: Tipo de documento y número */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Tipo de Identificación *
                     </label>
                     <select
@@ -765,7 +762,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Número de Identificación *
                     </label>
                     <input
@@ -781,7 +778,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Fecha de Expedición del Documento
                     </label>
                     <input
@@ -799,7 +796,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Primer Nombre *
                     </label>
                     <input
@@ -815,7 +812,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Segundo Nombre
                     </label>
                     <input
@@ -828,7 +825,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Primer Apellido *
                     </label>
                     <input
@@ -844,7 +841,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Segundo Apellido
                     </label>
                     <input
@@ -857,7 +854,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Fecha de Nacimiento *
                     </label>
                     <input
@@ -872,8 +869,14 @@ export default function ContractModal({
                   </div>
 
 
+                  {/* Separador visual */}
+                  <div className="col-span-2">
+                    <hr className="border-gray-200 my-3" />
+                    <h4 className="text-sm font-medium text-gray-800 mb-3">Información de Contacto</h4>
+                  </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Celular
                     </label>
                     <input
@@ -886,7 +889,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Email
                     </label>
                     <input
@@ -906,12 +909,12 @@ export default function ContractModal({
 
             {/* Tab 2: Detalles del Contrato */}
             {currentTab === 1 && (
-              <div className="space-y-4 lg:space-y-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Detalles del Contrato</h3>
+              <div className="space-y-3 lg:space-y-4">
+                <h3 className="text-base font-semibold text-gray-900 mb-2">Detalles del Contrato</h3>
                 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Empresa Interna *
                     </label>
                     <select
@@ -926,7 +929,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Empresa Cliente *
                     </label>
                     <CompanySelector
@@ -943,7 +946,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Ciudad donde Labora
                     </label>
                     <input
@@ -956,7 +959,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Cargo
                     </label>
                     <input
@@ -972,7 +975,7 @@ export default function ContractModal({
 
                   {/* Campo SENA mejorado con tooltip */}
                   <div className="col-span-1 lg:col-span-2">
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <div className="flex items-center space-x-3">
                         <input
                           type="checkbox"
@@ -982,7 +985,7 @@ export default function ContractModal({
                           {...getCheckboxProps()}
                           className="w-5 h-5"
                         />
-                        <div className="text-lg font-bold text-blue-800 flex items-center space-x-2">
+                        <div className="text-base font-bold text-blue-800 flex items-center space-x-2">
                           <span>🏛️ Aporta al SENA</span>
                           <div className="relative group">
                             <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold cursor-help">
@@ -1009,7 +1012,7 @@ export default function ContractModal({
 
                   {/* Tipo de Contrato - Fila completa */}
                   <div className="col-span-1 lg:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Tipo de Contrato
                     </label>
                     <select
@@ -1027,7 +1030,7 @@ export default function ContractModal({
 
                   {/* Fechas - Una fila para las dos fechas */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Fecha de Ingreso
                     </label>
                     <input
@@ -1040,7 +1043,7 @@ export default function ContractModal({
 
                   {/* Fecha fin SIEMPRE visible - se deshabilita si es indefinido */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Fecha de Terminación
                       {formData.tipo_contrato === 'Indefinido' && (
                         <span className="text-xs text-gray-500 ml-1">(No aplica)</span>
@@ -1065,7 +1068,7 @@ export default function ContractModal({
 
                   {/* Tipo de Salario - Fila completa */}
                   <div className="col-span-1 lg:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Tipo de Salario
                     </label>
                     <select
@@ -1081,7 +1084,7 @@ export default function ContractModal({
 
                   {/* Layout fijo - Salario y Auxilio Transporte siempre juntos */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Salario
                     </label>
                     <input
@@ -1102,7 +1105,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Auxilio de Transporte
                     </label>
                     <input
@@ -1121,7 +1124,7 @@ export default function ContractModal({
 
                   {/* Layout fijo - Auxilios siempre numero y concepto lado a lado */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Auxilio Salarial
                     </label>
                     <input
@@ -1139,7 +1142,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Concepto Auxilio Salarial
                     </label>
                     <input
@@ -1152,7 +1155,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Auxilio No Salarial
                     </label>
                     <input
@@ -1170,7 +1173,7 @@ export default function ContractModal({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
                       Concepto Auxilio No Salarial
                     </label>
                     <input
@@ -1184,11 +1187,11 @@ export default function ContractModal({
 
                   {/* Total Remuneración - Campo calculado */}
                   <div className="col-span-1 lg:col-span-2">
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                      <label className="block text-sm font-semibold text-green-800 mb-2">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <label className="block text-xs font-semibold text-green-800 mb-1">
                         💰 Total Remuneración
                       </label>
-                      <div className="text-lg font-bold text-green-900">
+                      <div className="text-base font-bold text-green-900">
                         {formatCurrency(calculateTotalRemuneration(formData))}
                       </div>
                       <div className="text-xs text-green-700 mt-1">
@@ -1199,9 +1202,9 @@ export default function ContractModal({
                 </div>
 
                 {/* Condición Médica */}
-                <div className="bg-orange-50 p-6 rounded-xl">
-                  <h4 className="text-md font-semibold text-gray-900 mb-4">🏥 Información Médica</h4>
-                  <div className="space-y-4">
+                <div className="bg-orange-50 p-3 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">🏥 Información Médica</h4>
+                  <div className="space-y-3">
                     <div className="flex items-center space-x-3">
                       <input
                         type="checkbox"
@@ -1218,7 +1221,7 @@ export default function ContractModal({
                     {/* Campo de detalle solo si tiene condición médica */}
                     {formData.tiene_condicion_medica && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
                           Descripción de la Condición Médica *
                         </label>
                         <textarea
@@ -1238,11 +1241,11 @@ export default function ContractModal({
                 </div>
 
                 {/* Beneficiarios */}
-                <div className="bg-gray-50 p-6 rounded-xl">
-                  <h4 className="text-md font-semibold text-gray-900 mb-4">Beneficiarios</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Beneficiarios</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
                         Hijos
                       </label>
                       <input
@@ -1258,7 +1261,7 @@ export default function ContractModal({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
                         Madre
                       </label>
                       <select
@@ -1272,7 +1275,7 @@ export default function ContractModal({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
                         Padre
                       </label>
                       <select
@@ -1286,7 +1289,7 @@ export default function ContractModal({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
                         Cónyuge
                       </label>
                       <select
@@ -1302,11 +1305,11 @@ export default function ContractModal({
                 </div>
 
                 {/* Fechas de Inscripción Beneficiarios */}
-                <div className="bg-blue-50 p-6 rounded-xl">
-                  <h4 className="text-md font-semibold text-gray-900 mb-4">Fechas de Inscripción Beneficiarios</h4>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Fechas de Inscripción Beneficiarios</h4>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
                         Fecha de Solicitud
                       </label>
                       <input
@@ -1318,7 +1321,7 @@ export default function ContractModal({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
                         Fecha de Radicado
                       </label>
                       <input
@@ -1335,7 +1338,7 @@ export default function ContractModal({
 
             {/* Tab 3: Onboarding */}
             {currentTab === 2 && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">Proceso de Onboarding</h3>
                   <div className="text-sm text-gray-600">
@@ -1404,12 +1407,12 @@ export default function ContractModal({
         </div>
 
         {/* Footer con navegación */}
-        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex items-center justify-between">
+        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50 flex items-center justify-between">
           <button
             type="button"
             onClick={prevTab}
             disabled={currentTab === 0}
-            className={`px-4 py-2 rounded-xl transition-all ${
+            className={`px-3 py-1.5 rounded-lg transition-all text-sm ${
               currentTab === 0
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
@@ -1426,7 +1429,7 @@ export default function ContractModal({
             <button
               type="button"
               onClick={nextTab}
-              className="px-6 py-2 bg-[#004C4C] text-white rounded-xl hover:bg-[#065C5C] transition-all"
+              className="px-4 py-1.5 bg-[#004C4C] text-white rounded-lg hover:bg-[#065C5C] transition-all text-sm"
             >
               Siguiente
             </button>
@@ -1435,7 +1438,7 @@ export default function ContractModal({
               type="button"
               onClick={handleSubmit}
               disabled={loading || isReadOnly}
-              className={`px-6 py-2 rounded-xl transition-all ${
+              className={`px-4 py-1.5 rounded-lg transition-all text-sm ${
                 loading || isReadOnly
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-[#004C4C] hover:bg-[#065C5C]'

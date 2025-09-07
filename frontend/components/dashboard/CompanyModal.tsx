@@ -220,30 +220,27 @@ export default function CompanyModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto my-0 flex flex-col h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] sm:h-auto sm:max-h-[calc(100vh-4rem)]">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white p-6 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-[#87E0E0] rounded-full flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-[#004C4C]" />
+        <div className="bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white p-3 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-[#87E0E0] rounded-full flex items-center justify-center">
+              <Building2 className="h-4 w-4 text-[#004C4C]" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">
+              <h2 className="text-lg font-bold">
                 {mode === 'create' ? 'Nueva Empresa' : 'Editar Empresa'}
               </h2>
-              <p className="text-[#87E0E0] text-sm">
-                {mode === 'create' ? 'Agregar empresa cliente' : 'Modificar información de la empresa'}
-              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 hover:bg-[#0A6A6A] rounded-full flex items-center justify-center transition-colors"
+            className="w-6 h-6 hover:bg-[#0A6A6A] rounded-full flex items-center justify-center transition-colors"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain">
           
           {/* Mensaje de éxito eliminado: padre mostrará Toast */}
 
@@ -255,18 +252,18 @@ export default function CompanyModal({
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             
             {/* Información de la Empresa */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2 mb-4">
-                <Building2 className="h-5 w-5 text-[#004C4C]" />
-                <h3 className="text-lg font-semibold text-gray-900">Información de la Empresa</h3>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2 mb-2">
+                <Building2 className="h-4 w-4 text-[#004C4C]" />
+                <h3 className="text-base font-semibold text-gray-900">Información de la Empresa</h3>
               </div>
 
               {/* Nombre */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
                   Nombre de la Empresa *
                 </label>
                 <input
@@ -274,7 +271,7 @@ export default function CompanyModal({
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] transition-colors ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] transition-colors ${
                     errors.name ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Ej: Good Temporal SAS"
@@ -287,7 +284,7 @@ export default function CompanyModal({
 
               {/* NIT */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
                   NIT *
                 </label>
                 <input
@@ -295,7 +292,7 @@ export default function CompanyModal({
                   name="tax_id"
                   value={formData.tax_id}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] transition-colors ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] transition-colors ${
                     errors.tax_id ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="900123456"
@@ -323,15 +320,15 @@ export default function CompanyModal({
             </div>
 
             {/* Contacto de Cuentas por Cobrar */}
-            <div className="space-y-4 pt-6 border-t border-gray-200">
-              <div className="flex items-center space-x-2 mb-4">
-                <User className="h-5 w-5 text-[#004C4C]" />
-                <h3 className="text-lg font-semibold text-gray-900">Contacto de Cuentas por Cobrar</h3>
+            <div className="space-y-3 pt-4 border-t border-gray-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <User className="h-4 w-4 text-[#004C4C]" />
+                <h3 className="text-base font-semibold text-gray-900">Contacto de Cuentas por Cobrar</h3>
               </div>
 
               {/* Nombre del contacto */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
                   Nombre Completo *
                 </label>
                 <input
@@ -339,7 +336,7 @@ export default function CompanyModal({
                   name="accounts_contact_name"
                   value={formData.accounts_contact_name}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] transition-colors ${
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] transition-colors ${
                     errors.accounts_contact_name ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="Ej: María Pérez González"
@@ -354,7 +351,7 @@ export default function CompanyModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
                     Email *
                   </label>
                   <div className="relative">
@@ -378,7 +375,7 @@ export default function CompanyModal({
 
                 {/* Teléfono */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
                     Teléfono *
                   </label>
                   <div className="relative">
@@ -405,11 +402,11 @@ export default function CompanyModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3">
+        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-100 transition-colors"
+            className="w-full sm:w-auto px-4 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-sm"
             disabled={loading}
           >
             Cancelar
@@ -418,7 +415,7 @@ export default function CompanyModal({
             type="submit"
             onClick={handleSubmit}
             disabled={loading}
-            className="w-full sm:w-auto px-6 py-2 bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white rounded-xl hover:from-[#065C5C] hover:to-[#0A6A6A] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-4 py-1.5 bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white rounded-lg hover:from-[#065C5C] hover:to-[#0A6A6A] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
             {loading ? (
               <div className="flex items-center justify-center space-x-2">
