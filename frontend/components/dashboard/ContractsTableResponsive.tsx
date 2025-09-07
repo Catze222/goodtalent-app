@@ -71,19 +71,21 @@ export default function ContractsTableResponsive({
       )
     },
     {
-      key: 'nombre_empleado',
+      key: 'primer_nombre',
       label: 'Empleado',
       sortable: true,
       mobileShow: true,
-      render: (value: string) => (
+      render: (value: string, record: Contract) => (
         <div className="flex items-center">
           <User className="w-4 h-4 text-gray-400 mr-2" />
-          <span className="font-medium text-gray-900">{value}</span>
+          <span className="font-medium text-gray-900">
+            {`${record.primer_nombre} ${record.primer_apellido}`}
+          </span>
         </div>
       )
     },
     {
-      key: 'empresa_nombre',
+      key: 'empresa_interna',
       label: 'Empresa',
       sortable: true,
       mobileShow: true,
@@ -115,19 +117,19 @@ export default function ContractsTableResponsive({
       )
     },
     {
-      key: 'fecha_inicio_contrato',
+      key: 'fecha_ingreso',
       label: 'Inicio',
       sortable: true,
       mobileShow: false,
-      render: (value: string) => (
+      render: (value: string) => value ? (
         <div className="flex items-center text-sm">
           <Calendar className="w-3 h-3 text-gray-400 mr-1" />
           {formatDateColombia(value)}
         </div>
-      )
+      ) : 'No definido'
     },
     {
-      key: 'fecha_fin_contrato',
+      key: 'fecha_fin',
       label: 'Fin',
       sortable: true,
       mobileShow: false,
@@ -146,8 +148,7 @@ export default function ContractsTableResponsive({
           {canApprove && value === 'borrador' && (
             <ContractApprovalButton
               contract={record}
-              onApprovalChange={onApprovalChange}
-              size="sm"
+              onSuccess={onApprovalChange}
             />
           )}
         </div>
@@ -188,12 +189,12 @@ export default function ContractsTableResponsive({
 
   // Función para generar título móvil
   const getMobileTitle = (contract: Contract) => {
-    return contract.nombre_empleado || 'Sin nombre'
+    return `${contract.primer_nombre} ${contract.primer_apellido}`
   }
 
   // Función para generar subtítulo móvil
   const getMobileSubtitle = (contract: Contract) => {
-    return `${contract.empresa_nombre} • ${contract.cargo || 'Sin cargo'}`
+    return `${contract.empresa_interna} • ${contract.cargo || 'Sin cargo'}`
   }
 
   // Función para generar badge móvil
