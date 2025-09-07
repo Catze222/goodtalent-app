@@ -21,12 +21,16 @@ import {
   Contract, 
   getContractStatusConfig, 
   getStatusAprobacionConfig, 
-  getStatusVigenciaConfig 
+  getStatusVigenciaConfig,
+  calculateTotalRemuneration,
+  formatCurrency 
 } from '../../types/contract'
 import { ContractStatusCompact } from '../ui/ContractStatusBadges'
 import ContractApprovalButton from '../ui/ContractApprovalButton'
 import DeleteContractModal from '../ui/DeleteContractModal'
 import ReportNoveltyButton from '../ui/ReportNoveltyButton'
+import OnboardingDetailModal from '../ui/OnboardingDetailModal'
+import ConfirmationModal from '../ui/ConfirmationModal'
 
 interface ContractsTableProps {
   contracts: Contract[]
@@ -42,15 +46,17 @@ type OnboardingField =
   | 'programacion_cita_examenes' 
   | 'examenes' 
   | 'solicitud_inscripcion_arl' 
-  | 'inscripcion_arl' 
+  | 'confirmacion_arl' // Campo visual (inferido)
   | 'envio_contrato' 
   | 'recibido_contrato_firmado' 
   | 'solicitud_eps' 
-  | 'confirmacion_eps' 
+  | 'confirmacion_eps' // Campo visual (inferido)
   | 'envio_inscripcion_caja' 
-  | 'confirmacion_inscripcion_caja' 
-  | 'radicado_eps' 
-  | 'radicado_ccf'
+  | 'confirmacion_caja' // Campo visual (inferido)
+  | 'solicitud_cesantias'
+  | 'confirmacion_cesantias' // Campo visual (inferido)
+  | 'solicitud_fondo_pension'
+  | 'confirmacion_pension' // Campo visual (inferido)
 
 /**
  * Tabla moderna de contratos con scroll unificado y edición inline
@@ -68,6 +74,30 @@ export default function ContractsTable({
   const [loadingInline, setLoadingInline] = useState<Set<string>>(new Set())
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [contractToDelete, setContractToDelete] = useState<Contract | null>(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [detailModalData, setDetailModalData] = useState<{
+    contract: Contract | null
+    field: string
+    title: string
+    type: 'arl' | 'eps' | 'caja' | 'cesantias' | 'pension'
+  }>({
+    contract: null,
+    field: '',
+    title: '',
+    type: 'arl'
+  })
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmModalData, setConfirmModalData] = useState<{
+    title: string
+    message: string
+    onConfirm: () => void
+    type: 'warning' | 'danger' | 'info'
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'warning'
+  })
 
   // Formatear fechas
   const formatDate = (dateString?: string | null) => {
@@ -80,14 +110,9 @@ export default function ContractsTable({
   }
 
   // Formatear moneda con puntos como separadores
-  const formatCurrency = (amount?: number | null) => {
+  const formatCurrencyLocal = (amount?: number | null) => {
     if (!amount) return '-'
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount).replace(/,/g, '.')
+    return formatCurrency(amount)
   }
 
   // Generar grid columns dinámicamente
@@ -98,7 +123,8 @@ export default function ContractsTable({
       '140px', // Empresa
       '130px', // Contrato
       '110px', // F. Ingreso
-      '110px'  // F. Terminación
+      '110px', // F. Terminación
+      '130px'  // Total Remuneración
     ]
     
     // Agregar columnas dinámicas para onboarding (85px cada una)
@@ -115,25 +141,341 @@ export default function ContractsTable({
 
   // Calcular ancho mínimo dinámicamente
   const calculateMinWidth = () => {
-    const baseWidth = 100 + 200 + 140 + 130 + 110 + 110 + 90 // Columnas fijas: 880px
+    const baseWidth = 100 + 200 + 140 + 130 + 110 + 110 + 130 + 90 // Columnas fijas: 1010px
     const onboardingWidth = onboardingFields.length * 85 // Columnas dinámicas
-    const gaps = (6 + onboardingFields.length) * 8 // 8px gap entre columnas
+    const gaps = (7 + onboardingFields.length) * 8 // 8px gap entre columnas
     return baseWidth + onboardingWidth + gaps + 50 // +50px margen de seguridad
   }
 
 
 
-  // Toggle inline de campos de onboarding
+  // Función para obtener información de dependencia
+  const getDependencyInfo = (field: OnboardingField) => {
+    const fieldConfig = onboardingFields.find(f => f.key === field)
+    return fieldConfig?.dependency || null
+  }
+
+  // Función para verificar si se puede marcar un campo
+  const canMarkField = (contract: Contract, field: OnboardingField): { canMark: boolean, message?: string } => {
+    const dependency = getDependencyInfo(field)
+    
+    if (!dependency) {
+      return { canMark: true }
+    }
+
+    const dependencyValue = contract[dependency as keyof Contract] as boolean
+    if (!dependencyValue) {
+      const dependencyLabel = onboardingFields.find(f => f.key === dependency)?.label || dependency
+      return {
+        canMark: false,
+        message: `Primero debe completar: ${dependencyLabel}`
+      }
+    }
+
+    return { canMark: true }
+  }
+
+  // Función para obtener el estado de confirmación (campos reales y virtuales)
+  const getFieldConfirmationState = (contract: Contract, field: OnboardingField): 'empty' | 'pending' | 'confirmed' => {
+    
+    // Campos virtuales de confirmación (no existen en BD)
+    switch (field) {
+      case 'confirmacion_arl':
+        if (!contract.solicitud_inscripcion_arl) return 'empty'
+        return (contract.arl_nombre && contract.arl_fecha_confirmacion) ? 'confirmed' : 'pending'
+      
+      case 'confirmacion_eps':
+        if (!contract.solicitud_eps) return 'empty'
+        return (contract.radicado_eps && contract.eps_fecha_confirmacion) ? 'confirmed' : 'pending'
+      
+      case 'confirmacion_caja':
+        if (!contract.envio_inscripcion_caja) return 'empty'
+        return (contract.radicado_ccf && contract.caja_fecha_confirmacion) ? 'confirmed' : 'pending'
+      
+      case 'confirmacion_cesantias':
+        if (!contract.solicitud_cesantias) return 'empty'
+        return (contract.fondo_cesantias && contract.cesantias_fecha_confirmacion) ? 'confirmed' : 'pending'
+      
+      case 'confirmacion_pension':
+        if (!contract.solicitud_fondo_pension) return 'empty'
+        return (contract.fondo_pension && contract.pension_fecha_confirmacion) ? 'confirmed' : 'pending'
+    }
+    
+    // Campos reales de BD
+    const baseValue = contract[field as keyof Contract] as boolean
+    
+    // Si el campo base no está marcado, está vacío
+    if (!baseValue) return 'empty'
+    
+    // Verificar confirmación basada en presencia de datos para campos con modal
+    switch (field) {
+      case 'examenes':
+        return contract.examenes_fecha ? 'confirmed' : 'pending'
+      
+      case 'recibido_contrato_firmado':
+        return contract.contrato_fecha_confirmacion ? 'confirmed' : 'pending'
+      
+      default:
+        // Para campos simples como programacion_cita_examenes, envio_contrato, solicitudes
+        return baseValue ? 'confirmed' : 'empty'
+    }
+  }
+
+  // Función para mostrar toast informativo
+  const showInfoToast = (message: string, type: 'info' | 'warning' | 'success' = 'info') => {
+    // Crear elemento de toast temporal
+    const toast = document.createElement('div')
+    toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 transform ${
+      type === 'info' ? 'bg-blue-500 text-white' :
+      type === 'warning' ? 'bg-amber-500 text-white' :
+      'bg-green-500 text-white'
+    }`
+    toast.innerHTML = `
+      <div class="flex items-center space-x-2">
+        <div class="flex-shrink-0">
+          ${type === 'info' ? '💡' : type === 'warning' ? '⚠️' : '✅'}
+        </div>
+        <div class="text-sm font-medium">${message}</div>
+      </div>
+    `
+    
+    document.body.appendChild(toast)
+    
+    // Animar entrada
+    setTimeout(() => toast.classList.add('translate-x-0'), 100)
+    
+    // Remover después de 3 segundos
+    setTimeout(() => {
+      toast.classList.add('translate-x-full', 'opacity-0')
+      setTimeout(() => document.body.removeChild(toast), 300)
+    }, 3000)
+  }
+
+  // Toggle inline de campos de onboarding (reales y virtuales)
   const handleToggleOnboarding = async (contractId: string, field: OnboardingField, currentValue: boolean) => {
     if (!canUpdate) return
 
     // Buscar el contrato para verificar si se puede editar
     const contract = contracts.find(c => c.id === contractId)
     if (!contract || !getContractStatusConfig(contract).can_edit) {
-      console.warn('No se puede editar este contrato - está aprobado')
+      showInfoToast('Este contrato no se puede editar porque ya está aprobado', 'warning')
       return
     }
 
+    const fieldConfig = onboardingFields.find(f => f.key === field)
+    const isVirtualField = fieldConfig?.isVirtual || false
+
+    // MANEJO DE CAMPOS VIRTUALES (confirmaciones)
+    if (isVirtualField) {
+      const confirmationState = getFieldConfirmationState(contract, field)
+      
+      if (confirmationState === 'confirmed') {
+        // Si está confirmado y se quiere desmarcar, limpiar datos
+        const fieldLabel = fieldConfig?.label || field
+        setConfirmModalData({
+          title: 'Eliminar Confirmación',
+          message: `⚠️ ADVERTENCIA: Está a punto de eliminar la confirmación de "${fieldLabel}".\n\nSe eliminarán los datos asociados (fechas, nombres, etc.).\n\n¿Está seguro de que desea continuar?`,
+          onConfirm: async () => {
+            await clearAssociatedData(contractId, field)
+            showInfoToast(`Datos de confirmación de ${fieldLabel} eliminados`, 'info')
+          },
+          type: 'warning'
+        })
+        setShowConfirmModal(true)
+        return
+      }
+      
+      if (confirmationState === 'empty') {
+        showInfoToast('Primero debe marcar la solicitud correspondiente', 'warning')
+        return
+      }
+      
+      // Si está pending, abrir modal para confirmar
+      setDetailModalData({
+        contract,
+        field,
+        title: getModalTitle(field),
+        type: getModalType(field)
+      })
+      setShowDetailModal(true)
+      return
+    }
+
+    // MANEJO DE CAMPOS REALES (solicitudes)
+    // Si se está desmarcando (currentValue es true, queremos marcar como false)
+    if (currentValue) {
+      const confirmationState = getFieldConfirmationState(contract, field)
+      
+      // Si está confirmado (tiene datos), mostrar advertencia
+      if (confirmationState === 'confirmed') {
+        const fieldLabel = fieldConfig?.label || field
+        setConfirmModalData({
+          title: 'Desmarcar Campo',
+          message: `⚠️ ADVERTENCIA: Está a punto de desmarcar "${fieldLabel}" que ya tiene información completada.\n\nAl desmarcar se perderán los datos asociados (fechas, nombres, etc.).\n\n¿Está seguro de que desea continuar?`,
+          onConfirm: async () => {
+            await clearAssociatedData(contractId, field)
+            showInfoToast(`${fieldLabel} y sus datos asociados han sido eliminados`, 'info')
+          },
+          type: 'warning'
+        })
+        setShowConfirmModal(true)
+        return
+      }
+    }
+
+    // Si se está marcando (currentValue es false, queremos marcar como true)
+    if (!currentValue) {
+      // Verificar dependencias
+      const { canMark, message } = canMarkField(contract, field)
+      if (!canMark) {
+        showInfoToast(message!, 'warning')
+        return
+      }
+
+      // Si es un campo que requiere información adicional, abrir modal
+      if (fieldConfig?.requiresModal) {
+        setDetailModalData({
+          contract,
+          field,
+          title: getModalTitle(field),
+          type: getModalType(field)
+        })
+        setShowDetailModal(true)
+        return
+      }
+    }
+
+    // Para campos simples o desmarcado sin datos, actualizar directamente
+    await updateOnboardingField(contractId, field, !currentValue)
+    
+    // Mostrar mensaje de éxito
+    const fieldLabel = fieldConfig?.label || field
+    showInfoToast(
+      `${fieldLabel} ${!currentValue ? 'marcado' : 'desmarcado'} correctamente`, 
+      'success'
+    )
+  }
+
+  // Obtener título del modal según el campo
+  const getModalTitle = (field: OnboardingField): string => {
+    const titles: Record<string, string> = {
+      'examenes': 'Confirmación de Exámenes Médicos',
+      'recibido_contrato_firmado': 'Confirmación de Contrato Firmado',
+      'solicitud_inscripcion_arl': 'Información de ARL',
+      'confirmacion_arl': 'Confirmación de ARL',
+      'solicitud_eps': 'Información de EPS',
+      'confirmacion_eps': 'Confirmación de EPS',
+      'envio_inscripcion_caja': 'Información de Caja de Compensación',
+      'confirmacion_caja': 'Confirmación de Caja de Compensación',
+      'solicitud_cesantias': 'Información de Cesantías',
+      'confirmacion_cesantias': 'Confirmación de Cesantías',
+      'solicitud_fondo_pension': 'Información de Fondo de Pensión',
+      'confirmacion_pension': 'Confirmación de Fondo de Pensión'
+    }
+    return titles[field] || 'Información Adicional'
+  }
+
+  // Obtener tipo del modal según el campo
+  const getModalType = (field: OnboardingField): 'arl' | 'eps' | 'caja' | 'cesantias' | 'pension' => {
+    const types: Record<string, 'arl' | 'eps' | 'caja' | 'cesantias' | 'pension'> = {
+      'examenes': 'arl', // Reutilizamos el tipo para fechas simples
+      'recibido_contrato_firmado': 'arl', // Reutilizamos el tipo para fechas simples
+      'solicitud_inscripcion_arl': 'arl',
+      'confirmacion_arl': 'arl',
+      'solicitud_eps': 'eps',
+      'confirmacion_eps': 'eps',
+      'envio_inscripcion_caja': 'caja',
+      'confirmacion_caja': 'caja',
+      'solicitud_cesantias': 'cesantias',
+      'confirmacion_cesantias': 'cesantias',
+      'solicitud_fondo_pension': 'pension',
+      'confirmacion_pension': 'pension'
+    }
+    return types[field] || 'arl'
+  }
+
+  // Limpiar datos asociados cuando se desmarca un campo confirmado
+  const clearAssociatedData = async (contractId: string, field: OnboardingField) => {
+    const newLoadingInline = new Set(loadingInline)
+    newLoadingInline.add(contractId)
+    setLoadingInline(newLoadingInline)
+
+    try {
+      let updateData: Record<string, any> = {}
+
+      // Manejar campos virtuales y reales
+      switch (field) {
+        case 'examenes':
+          updateData = { [field]: false, examenes_fecha: null }
+          break
+        
+        case 'recibido_contrato_firmado':
+          updateData = { [field]: false, contrato_fecha_confirmacion: null }
+          break
+        
+        case 'solicitud_inscripcion_arl':
+          updateData = { [field]: false, arl_nombre: null, arl_fecha_confirmacion: null }
+          break
+        
+        case 'confirmacion_arl':
+          updateData = { arl_nombre: null, arl_fecha_confirmacion: null }
+          break
+        
+        case 'solicitud_eps':
+          updateData = { [field]: false, radicado_eps: null, eps_fecha_confirmacion: null }
+          break
+        
+        case 'confirmacion_eps':
+          updateData = { radicado_eps: null, eps_fecha_confirmacion: null }
+          break
+        
+        case 'envio_inscripcion_caja':
+          updateData = { [field]: false, radicado_ccf: null, caja_fecha_confirmacion: null }
+          break
+        
+        case 'confirmacion_caja':
+          updateData = { radicado_ccf: null, caja_fecha_confirmacion: null }
+          break
+        
+        case 'solicitud_cesantias':
+          updateData = { [field]: false, fondo_cesantias: null, cesantias_fecha_confirmacion: null }
+          break
+        
+        case 'confirmacion_cesantias':
+          updateData = { fondo_cesantias: null, cesantias_fecha_confirmacion: null }
+          break
+        
+        case 'solicitud_fondo_pension':
+          updateData = { [field]: false, fondo_pension: null, pension_fecha_confirmacion: null }
+          break
+        
+        case 'confirmacion_pension':
+          updateData = { fondo_pension: null, pension_fecha_confirmacion: null }
+          break
+
+        default:
+          updateData = { [field]: false }
+          break
+      }
+
+      const { error } = await supabase
+        .from('contracts')
+        .update(updateData)
+        .eq('id', contractId)
+
+      if (error) throw error
+      onUpdate()
+    } catch (error) {
+      console.error('Error clearing associated data:', error)
+    } finally {
+      const newLoadingInline = new Set(loadingInline)
+      newLoadingInline.delete(contractId)
+      setLoadingInline(newLoadingInline)
+    }
+  }
+
+  // Actualizar campo de onboarding (función separada para reutilización)
+  const updateOnboardingField = async (contractId: string, field: OnboardingField, value: boolean) => {
     const newLoadingInline = new Set(loadingInline)
     newLoadingInline.add(contractId)
     setLoadingInline(newLoadingInline)
@@ -141,7 +483,7 @@ export default function ContractsTable({
     try {
       const { error } = await supabase
         .from('contracts')
-        .update({ [field]: !currentValue })
+        .update({ [field]: value })
         .eq('id', contractId)
 
       if (error) throw error
@@ -194,19 +536,35 @@ export default function ContractsTable({
     return 'bg-red-400'
   }
 
+  // Reorganizado con lógica de dependencias y campos correctos
   const onboardingFields = [
-    { key: 'programacion_cita_examenes' as OnboardingField, label: 'Prog Cita' },
-    { key: 'examenes' as OnboardingField, label: 'Exámenes' },
-    { key: 'solicitud_inscripcion_arl' as OnboardingField, label: 'Sol ARL' },
-    { key: 'inscripcion_arl' as OnboardingField, label: 'ARL' },
-    { key: 'envio_contrato' as OnboardingField, label: 'Envío' },
-    { key: 'recibido_contrato_firmado' as OnboardingField, label: 'Firmado' },
-    { key: 'solicitud_eps' as OnboardingField, label: 'Sol EPS' },
-    { key: 'confirmacion_eps' as OnboardingField, label: 'EPS' },
-    { key: 'envio_inscripcion_caja' as OnboardingField, label: 'Env Caja' },
-    { key: 'confirmacion_inscripcion_caja' as OnboardingField, label: 'Caja' },
-    { key: 'radicado_eps' as OnboardingField, label: 'Rad EPS' },
-    { key: 'radicado_ccf' as OnboardingField, label: 'Rad CCF' }
+    // EXÁMENES MÉDICOS
+    { key: 'programacion_cita_examenes' as OnboardingField, label: 'Prog Cita', category: 'examenes' },
+    { key: 'examenes' as OnboardingField, label: 'Exámenes', category: 'examenes', requiresModal: true, dependency: 'programacion_cita_examenes' },
+    
+    // CONTRATOS
+    { key: 'envio_contrato' as OnboardingField, label: 'Envío', category: 'contratos' },
+    { key: 'recibido_contrato_firmado' as OnboardingField, label: 'Contrato Firmado', category: 'contratos', requiresModal: true, dependency: 'envio_contrato' },
+    
+    // ARL - Solicitud + Confirmación (visual)
+    { key: 'solicitud_inscripcion_arl' as OnboardingField, label: 'Sol ARL', category: 'arl' },
+    { key: 'confirmacion_arl' as OnboardingField, label: 'ARL Conf', category: 'arl', requiresModal: true, dependency: 'solicitud_inscripcion_arl', isVirtual: true },
+    
+    // EPS - Solicitud + Confirmación (visual)
+    { key: 'solicitud_eps' as OnboardingField, label: 'Sol EPS', category: 'eps' },
+    { key: 'confirmacion_eps' as OnboardingField, label: 'EPS Conf', category: 'eps', requiresModal: true, dependency: 'solicitud_eps', isVirtual: true },
+    
+    // CAJA DE COMPENSACIÓN - Envío + Confirmación (visual)
+    { key: 'envio_inscripcion_caja' as OnboardingField, label: 'Env Caja', category: 'caja' },
+    { key: 'confirmacion_caja' as OnboardingField, label: 'Caja Conf', category: 'caja', requiresModal: true, dependency: 'envio_inscripcion_caja', isVirtual: true },
+    
+    // CESANTÍAS - Solicitud + Confirmación (visual)
+    { key: 'solicitud_cesantias' as OnboardingField, label: 'Sol Cesantías', category: 'cesantias' },
+    { key: 'confirmacion_cesantias' as OnboardingField, label: 'Cesantías Conf', category: 'cesantias', requiresModal: true, dependency: 'solicitud_cesantias', isVirtual: true },
+    
+    // PENSIÓN - Solicitud + Confirmación (visual)
+    { key: 'solicitud_fondo_pension' as OnboardingField, label: 'Sol Pensión', category: 'pension' },
+    { key: 'confirmacion_pension' as OnboardingField, label: 'Pensión Conf', category: 'pension', requiresModal: true, dependency: 'solicitud_fondo_pension', isVirtual: true }
   ]
 
   return (
@@ -228,6 +586,7 @@ export default function ContractsTable({
             <div>Contrato</div>
             <div>F. Ingreso</div>
             <div>F. Terminación</div>
+            <div>Total Remuneración</div>
             
             {/* Todos los campos de onboarding (12 campos) con labels escritos */}
             {onboardingFields.map(field => (
@@ -361,31 +720,102 @@ export default function ContractsTable({
                       )}
                     </div>
 
+                    {/* Total Remuneración */}
+                    <div className="text-sm">
+                      <div className="font-medium text-green-700">
+                        {formatCurrencyLocal(calculateTotalRemuneration(contract))}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Total remuneración
+                      </div>
+                    </div>
+
                     {/* Todos los campos de onboarding (12 campos) */}
                     {onboardingFields.map(field => {
                       const isLoading = loadingInline.has(contract.id!)
-                      const value = contract[field.key as keyof Contract]
+                      const isVirtual = field.isVirtual || false
+                      const confirmationState = getFieldConfirmationState(contract, field.key)
                       const statusConfig = getContractStatusConfig(contract)
                       const canEditField = canUpdate && statusConfig.can_edit
+                      
+                      // Para campos virtuales, el "currentValue" se determina por el estado de confirmación
+                      const currentValue = isVirtual 
+                        ? confirmationState === 'confirmed'
+                        : contract[field.key as keyof Contract] as boolean
+                      
+                      // Determinar estilo basado en el estado de confirmación (Verde=Solicitudes, Amarillo=Confirmaciones)
+                      const getButtonStyle = () => {
+                        if (isVirtual) {
+                          // Campos virtuales (confirmaciones) - AMARILLO cuando confirmado
+                          switch (confirmationState) {
+                            case 'empty':
+                              return 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                            case 'pending':
+                              return 'bg-gray-300 text-gray-500 hover:bg-gray-400 shadow-sm'
+                            case 'confirmed':
+                              return 'bg-yellow-500 text-white hover:bg-yellow-600 shadow-sm'
+                            default:
+                              return 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                          }
+                        } else {
+                          // Campos reales (solicitudes) - VERDE cuando marcado
+                          switch (confirmationState) {
+                            case 'empty':
+                              return 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                            case 'pending':
+                            case 'confirmed':
+                              return 'bg-green-600 text-white hover:bg-green-700 shadow-sm'
+                            default:
+                              return 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                          }
+                        }
+                      }
+
+                      const getTooltipText = () => {
+                        const base = `${field.label}: `
+                        if (isVirtual) {
+                          switch (confirmationState) {
+                            case 'empty':
+                              return base + 'Requiere solicitud primero'
+                            case 'pending':
+                              return base + 'Pendiente de confirmar'
+                            case 'confirmed':
+                              return base + 'Confirmado'
+                            default:
+                              return base + 'Pendiente'
+                          }
+                        } else {
+                          switch (confirmationState) {
+                            case 'empty':
+                              return base + 'No solicitado'
+                            case 'pending':
+                              return base + 'Solicitado (sin datos)'
+                            case 'confirmed':
+                              return base + 'Solicitado con datos'
+                            default:
+                              return base + 'Pendiente'
+                          }
+                        }
+                      }
                       
                       return (
                         <div key={field.key} className="flex justify-center">
                           <button
-                            onClick={() => handleToggleOnboarding(contract.id!, field.key, Boolean(value))}
+                            onClick={() => handleToggleOnboarding(contract.id!, field.key, currentValue)}
                             disabled={!canEditField || isLoading}
                             className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-200 ${
-                              value 
-                                ? 'bg-green-600 text-white hover:bg-green-700 shadow-sm' 
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                              getButtonStyle()
                             } ${!canEditField ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            title={`${field.label}: ${value ? 'Completado' : 'Pendiente'} ${!statusConfig.can_edit ? '(Solo lectura)' : ''}`}
+                            title={`${getTooltipText()} ${!statusConfig.can_edit ? '(Solo lectura)' : ''}`}
                           >
                             {isLoading ? (
                               <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : value ? (
-                              <Check className="h-3 w-3" />
-                            ) : (
+                            ) : confirmationState === 'empty' ? (
                               <X className="h-3 w-3" />
+                            ) : isVirtual && confirmationState === 'pending' ? (
+                              <div className="w-2 h-2 bg-gray-600 rounded-full" />
+                            ) : (
+                              <Check className="h-3 w-3" />
                             )}
                           </button>
                         </div>
@@ -467,15 +897,19 @@ export default function ContractsTable({
                       <div className="space-y-2">
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Salario Base:</span>
-                          <span className="text-gray-800 font-medium">{formatCurrency(contract.salario)}</span>
+                          <span className="text-gray-800 font-medium">{formatCurrencyLocal(contract.salario)}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Auxilio Salarial:</span>
-                          <span className="text-gray-800">{formatCurrency(contract.auxilio_salarial)}</span>
+                          <span className="text-gray-800">{formatCurrencyLocal(contract.auxilio_salarial)}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Concepto Aux. Salarial:</span>
                           <span className="text-gray-800">{contract.auxilio_salarial_concepto || 'No especificado'}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-gray-500 text-xs font-medium">💰 Total Remuneración:</span>
+                          <span className="text-green-700 font-bold text-lg">{formatCurrencyLocal(calculateTotalRemuneration(contract))}</span>
                         </div>
                       </div>
                     </div>
@@ -486,18 +920,26 @@ export default function ContractsTable({
                       <div className="space-y-2">
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Auxilio No Salarial:</span>
-                          <span className="text-gray-800">{formatCurrency(contract.auxilio_no_salarial)}</span>
+                          <span className="text-gray-800">{formatCurrencyLocal(contract.auxilio_no_salarial)}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Concepto Aux. No Salarial:</span>
                           <span className="text-gray-800">{contract.auxilio_no_salarial_concepto || 'No especificado'}</span>
                         </div>
+                        <div className="flex flex-col">
+                          <span className="text-gray-500 text-xs font-medium">Auxilio Transporte:</span>
+                          <span className="text-gray-800">{formatCurrencyLocal(contract.auxilio_transporte)}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-gray-500 text-xs font-medium">🏛️ Aporta SENA:</span>
+                          <span className="text-gray-800">{contract.base_sena ? 'Sí' : 'No'}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Segunda fila: 2 columnas COMPACTAS */}
-                  <div className="flex gap-4 text-sm max-w-5xl">
+                  {/* Segunda fila: 3 columnas COMPACTAS */}
+                  <div className="flex gap-4 text-sm max-w-7xl">
                     
                     {/* Beneficiarios */}
                     <div className="w-64">
@@ -519,6 +961,27 @@ export default function ContractsTable({
                           <span className="text-gray-500 text-xs font-medium">Cónyuge:</span>
                           <span className="text-gray-800">{contract.beneficiario_conyuge === 1 ? 'Sí' : 'No'}</span>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Información Médica */}
+                    <div className="w-64">
+                      <div className="font-semibold text-gray-800 mb-3 text-base h-6">🏥 Información Médica</div>
+                      <div className="space-y-2">
+                        <div className="flex flex-col">
+                          <span className="text-gray-500 text-xs font-medium">Condición Médica:</span>
+                          <span className="text-gray-800">
+                            {contract.tiene_condicion_medica ? 'Sí tiene' : 'No tiene'}
+                          </span>
+                        </div>
+                        {contract.tiene_condicion_medica && contract.condicion_medica_detalle && (
+                          <div className="flex flex-col">
+                            <span className="text-gray-500 text-xs font-medium">Detalle:</span>
+                            <span className="text-gray-800 text-xs leading-relaxed bg-orange-50 p-2 rounded border">
+                              {contract.condicion_medica_detalle}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -680,6 +1143,71 @@ export default function ContractsTable({
           onUpdate()
         }}
         contract={contractToDelete}
+      />
+
+      {/* Modal de Información Adicional */}
+      <OnboardingDetailModal
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        onSave={async (data) => {
+          if (!detailModalData.contract) return
+          
+          const updates: Record<string, any> = {}
+          
+          // Para campos virtuales, NO actualizar el campo base en BD
+          const isVirtualField = detailModalData.field.startsWith('confirmacion_')
+          
+          if (!isVirtualField) {
+            // Solo para campos reales (no virtuales)
+            updates[detailModalData.field] = true
+          }
+          
+          // Agregar fecha según el campo
+          if (data.dateField === 'examenes') {
+            updates['examenes_fecha'] = data.date
+          } else if (data.dateField === 'contrato') {
+            updates['contrato_fecha_confirmacion'] = data.date
+          } else {
+            updates[`${data.dateField}_fecha_confirmacion`] = data.date
+          }
+          
+          // Agregar campo de texto si existe
+          if (data.textField && data.text) {
+            updates[data.textField] = data.text
+          }
+
+          try {
+            const { error } = await supabase
+              .from('contracts')
+              .update(updates)
+              .eq('id', detailModalData.contract.id!)
+
+            if (error) throw error
+            
+            // Mostrar mensaje de éxito
+            const fieldLabel = onboardingFields.find(f => f.key === detailModalData.field)?.label || detailModalData.field
+            showInfoToast(`${fieldLabel} confirmado correctamente con fecha ${data.date}`, 'success')
+            
+            onUpdate()
+            setShowDetailModal(false)
+          } catch (error) {
+            console.error('Error updating contract details:', error)
+            showInfoToast('Error al guardar la información. Intenta de nuevo.', 'warning')
+          }
+        }}
+        data={detailModalData}
+      />
+
+      {/* Modal de Confirmación Personalizado */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={confirmModalData.onConfirm}
+        title={confirmModalData.title}
+        message={confirmModalData.message}
+        type={confirmModalData.type}
+        confirmText="Sí, continuar"
+        cancelText="Cancelar"
       />
     </div>
   )

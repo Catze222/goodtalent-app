@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, User, FileText, CheckSquare, ChevronRight, Shield, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
-import { Contract, getContractStatusConfig } from '../../types/contract'
+import { Contract, getContractStatusConfig, calculateTotalRemuneration, formatCurrency } from '../../types/contract'
 import OCRButton from '../ocr/OCRButton'
+import ContractModalOnboarding from './ContractModalOnboarding'
+import CompanySelector from '../ui/CompanySelector'
 
 
 
@@ -36,6 +38,7 @@ export default function ContractModal({
   companies
 }: ContractModalProps) {
   const [currentTab, setCurrentTab] = useState(0)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   
   // Lógica de estados del contrato
   const statusConfig = contract ? getContractStatusConfig(contract) : null
@@ -50,7 +53,6 @@ export default function ContractModal({
     numero_identificacion: '',
     fecha_expedicion_documento: '',
     fecha_nacimiento: '',
-    genero: '',
     celular: '',
     email: '',
     empresa_interna: '',
@@ -58,7 +60,7 @@ export default function ContractModal({
     ciudad_labora: '',
     cargo: '',
     numero_contrato_helisa: null,
-    base_sena: false,
+          base_sena: true,
     fecha_ingreso: '',
     tipo_contrato: '',
     fecha_fin: '',
@@ -68,25 +70,37 @@ export default function ContractModal({
     auxilio_salarial_concepto: '',
     auxilio_no_salarial: 0,
     auxilio_no_salarial_concepto: '',
-    beneficiario_hijo: 0,
-    beneficiario_madre: 0,
-    beneficiario_padre: 0,
-    beneficiario_conyuge: 0,
+  auxilio_transporte: 0,
+  tiene_condicion_medica: false,
+  condicion_medica_detalle: '',
+  beneficiario_hijo: 0,
+  beneficiario_madre: 0,
+  beneficiario_padre: 0,
+  beneficiario_conyuge: 0,
     fecha_solicitud: '',
     fecha_radicado: '',
     programacion_cita_examenes: false,
     examenes: false,
+    examenes_fecha: '',
     solicitud_inscripcion_arl: false,
-    inscripcion_arl: false,
+    arl_nombre: '',
+    arl_fecha_confirmacion: '',
     envio_contrato: false,
     recibido_contrato_firmado: false,
+    contrato_fecha_confirmacion: '',
     solicitud_eps: false,
-    confirmacion_eps: false,
+    eps_fecha_confirmacion: '',
     envio_inscripcion_caja: false,
-    confirmacion_inscripcion_caja: false,
+    caja_fecha_confirmacion: '',
+    solicitud_cesantias: false,
+    fondo_cesantias: '',
+    cesantias_fecha_confirmacion: '',
+    solicitud_fondo_pension: false,
+    fondo_pension: '',
+    pension_fecha_confirmacion: '',
     dropbox: '',
-    radicado_eps: false,
-    radicado_ccf: false,
+    radicado_eps: '',
+    radicado_ccf: '',
     observacion: '',
     status_aprobacion: 'borrador'
   })
@@ -189,7 +203,6 @@ export default function ContractModal({
           numero_identificacion: contract.numero_identificacion || '',
           fecha_expedicion_documento: contract.fecha_expedicion_documento || '',
           fecha_nacimiento: contract.fecha_nacimiento || '',
-          genero: contract.genero || '',
           celular: contract.celular || '',
           email: contract.email || '',
           empresa_interna: contract.empresa_interna || '',
@@ -207,6 +220,9 @@ export default function ContractModal({
           auxilio_salarial_concepto: contract.auxilio_salarial_concepto || '',
           auxilio_no_salarial: contract.auxilio_no_salarial || 0,
           auxilio_no_salarial_concepto: contract.auxilio_no_salarial_concepto || '',
+          auxilio_transporte: contract.auxilio_transporte || 0,
+          tiene_condicion_medica: contract.tiene_condicion_medica || false,
+          condicion_medica_detalle: contract.condicion_medica_detalle || '',
           beneficiario_hijo: contract.beneficiario_hijo || 0,
           beneficiario_madre: contract.beneficiario_madre || 0,
           beneficiario_padre: contract.beneficiario_padre || 0,
@@ -215,17 +231,26 @@ export default function ContractModal({
           fecha_radicado: contract.fecha_radicado || '',
           programacion_cita_examenes: contract.programacion_cita_examenes || false,
           examenes: contract.examenes || false,
+          examenes_fecha: contract.examenes_fecha || '',
           solicitud_inscripcion_arl: contract.solicitud_inscripcion_arl || false,
-          inscripcion_arl: contract.inscripcion_arl || false,
+          arl_nombre: contract.arl_nombre || '',
+          arl_fecha_confirmacion: contract.arl_fecha_confirmacion || '',
           envio_contrato: contract.envio_contrato || false,
           recibido_contrato_firmado: contract.recibido_contrato_firmado || false,
+          contrato_fecha_confirmacion: contract.contrato_fecha_confirmacion || '',
           solicitud_eps: contract.solicitud_eps || false,
-          confirmacion_eps: contract.confirmacion_eps || false,
+          eps_fecha_confirmacion: contract.eps_fecha_confirmacion || '',
           envio_inscripcion_caja: contract.envio_inscripcion_caja || false,
-          confirmacion_inscripcion_caja: contract.confirmacion_inscripcion_caja || false,
+          caja_fecha_confirmacion: contract.caja_fecha_confirmacion || '',
+          solicitud_cesantias: contract.solicitud_cesantias || false,
+          fondo_cesantias: contract.fondo_cesantias || '',
+          cesantias_fecha_confirmacion: contract.cesantias_fecha_confirmacion || '',
+          solicitud_fondo_pension: contract.solicitud_fondo_pension || false,
+          fondo_pension: contract.fondo_pension || '',
+          pension_fecha_confirmacion: contract.pension_fecha_confirmacion || '',
           dropbox: contract.dropbox || '',
-          radicado_eps: contract.radicado_eps || false,
-          radicado_ccf: contract.radicado_ccf || false,
+          radicado_eps: contract.radicado_eps || '',
+          radicado_ccf: contract.radicado_ccf || '',
           observacion: contract.observacion || ''
         })
       } else {
@@ -239,7 +264,6 @@ export default function ContractModal({
           numero_identificacion: '',
           fecha_expedicion_documento: '',
           fecha_nacimiento: '',
-          genero: '',
           celular: '',
           email: '',
           empresa_interna: '',
@@ -247,7 +271,7 @@ export default function ContractModal({
           ciudad_labora: '',
           cargo: '',
           numero_contrato_helisa: null,
-          base_sena: false,
+          base_sena: true,
           fecha_ingreso: '',
           tipo_contrato: '',
           fecha_fin: '',
@@ -266,16 +290,13 @@ export default function ContractModal({
           programacion_cita_examenes: false,
           examenes: false,
           solicitud_inscripcion_arl: false,
-          inscripcion_arl: false,
           envio_contrato: false,
           recibido_contrato_firmado: false,
           solicitud_eps: false,
-          confirmacion_eps: false,
           envio_inscripcion_caja: false,
-          confirmacion_inscripcion_caja: false,
           dropbox: '',
-          radicado_eps: false,
-          radicado_ccf: false,
+          radicado_eps: '',
+          radicado_ccf: '',
           observacion: '',
           status_aprobacion: 'borrador'
         })
@@ -327,7 +348,101 @@ export default function ContractModal({
       errorsByTab[1].push('salario')
     }
 
-    // Tab 2 (Onboarding) no tiene validaciones obligatorias
+    // Validación de condición médica
+    if (formData.tiene_condicion_medica && !(typeof formData.condicion_medica_detalle === 'string' && formData.condicion_medica_detalle.trim())) {
+      newErrors.condicion_medica_detalle = 'Debe describir la condición médica cuando está marcada'
+      errorsByTab[1].push('condicion_medica_detalle')
+    }
+
+    // Tab 2 (Onboarding) - Validaciones estrictas
+    // Si marcas un checkbox, los campos asociados son obligatorios
+    
+    // Exámenes realizados → fecha obligatoria
+    if (formData.examenes && !formData.examenes_fecha) {
+      newErrors.examenes_fecha = 'La fecha de exámenes es obligatoria cuando se marca como realizados'
+      errorsByTab[2].push('examenes_fecha')
+    }
+    
+    // Contrato firmado recibido → fecha obligatoria
+    if (formData.recibido_contrato_firmado && !formData.contrato_fecha_confirmacion) {
+      newErrors.contrato_fecha_confirmacion = 'La fecha de confirmación es obligatoria cuando se marca contrato recibido'
+      errorsByTab[2].push('contrato_fecha_confirmacion')
+    }
+    
+    // ARL solicitada con datos → nombre y fecha obligatorios
+    if (formData.solicitud_inscripcion_arl && (
+      (typeof formData.arl_nombre === 'string' && formData.arl_nombre.trim()) || 
+      formData.arl_fecha_confirmacion
+    )) {
+      if (!(typeof formData.arl_nombre === 'string' && formData.arl_nombre.trim())) {
+        newErrors.arl_nombre = 'El nombre de la ARL es obligatorio cuando se proporciona información de confirmación'
+        errorsByTab[2].push('arl_nombre')
+      }
+      if (!formData.arl_fecha_confirmacion) {
+        newErrors.arl_fecha_confirmacion = 'La fecha de confirmación ARL es obligatoria cuando se proporciona información de confirmación'
+        errorsByTab[2].push('arl_fecha_confirmacion')
+      }
+    }
+    
+    // EPS solicitada con datos → radicado y fecha obligatorios
+    if (formData.solicitud_eps && (
+      (typeof formData.radicado_eps === 'string' && formData.radicado_eps.trim()) || 
+      formData.eps_fecha_confirmacion
+    )) {
+      if (!(typeof formData.radicado_eps === 'string' && formData.radicado_eps.trim())) {
+        newErrors.radicado_eps = 'El radicado EPS es obligatorio cuando se proporciona información de confirmación'
+        errorsByTab[2].push('radicado_eps')
+      }
+      if (!formData.eps_fecha_confirmacion) {
+        newErrors.eps_fecha_confirmacion = 'La fecha de confirmación EPS es obligatoria cuando se proporciona información de confirmación'
+        errorsByTab[2].push('eps_fecha_confirmacion')
+      }
+    }
+    
+    // Caja enviada con datos → radicado y fecha obligatorios
+    if (formData.envio_inscripcion_caja && (
+      (typeof formData.radicado_ccf === 'string' && formData.radicado_ccf.trim()) || 
+      formData.caja_fecha_confirmacion
+    )) {
+      if (!(typeof formData.radicado_ccf === 'string' && formData.radicado_ccf.trim())) {
+        newErrors.radicado_ccf = 'El radicado CCF es obligatorio cuando se proporciona información de confirmación'
+        errorsByTab[2].push('radicado_ccf')
+      }
+      if (!formData.caja_fecha_confirmacion) {
+        newErrors.caja_fecha_confirmacion = 'La fecha de confirmación caja es obligatoria cuando se proporciona información de confirmación'
+        errorsByTab[2].push('caja_fecha_confirmacion')
+      }
+    }
+    
+    // Solicitud cesantías → fondo y fecha obligatorios SOLO SI HAY DATOS DE CONFIRMACIÓN
+    if (formData.solicitud_cesantias && (
+      (typeof formData.fondo_cesantias === 'string' && formData.fondo_cesantias.trim()) || 
+      formData.cesantias_fecha_confirmacion
+    )) {
+      if (!(typeof formData.fondo_cesantias === 'string' && formData.fondo_cesantias.trim())) {
+        newErrors.fondo_cesantias = 'El fondo de cesantías es obligatorio cuando se proporciona información de confirmación'
+        errorsByTab[2].push('fondo_cesantias')
+      }
+      if (!formData.cesantias_fecha_confirmacion) {
+        newErrors.cesantias_fecha_confirmacion = 'La fecha de confirmación de cesantías es obligatoria cuando se proporciona información de confirmación'
+        errorsByTab[2].push('cesantias_fecha_confirmacion')
+      }
+    }
+    
+    // Solicitud fondo pensión → fondo y fecha obligatorios SOLO SI HAY DATOS DE CONFIRMACIÓN  
+    if (formData.solicitud_fondo_pension && (
+      (typeof formData.fondo_pension === 'string' && formData.fondo_pension.trim()) || 
+      formData.pension_fecha_confirmacion
+    )) {
+      if (!(typeof formData.fondo_pension === 'string' && formData.fondo_pension.trim())) {
+        newErrors.fondo_pension = 'El fondo de pensión es obligatorio cuando se proporciona información de confirmación'
+        errorsByTab[2].push('fondo_pension')
+      }
+      if (!formData.pension_fecha_confirmacion) {
+        newErrors.pension_fecha_confirmacion = 'La fecha de confirmación de pensión es obligatoria cuando se proporciona información de confirmación'
+        errorsByTab[2].push('pension_fecha_confirmacion')
+      }
+    }
 
     return { errors: newErrors, errorsByTab }
   }
@@ -340,6 +455,12 @@ export default function ContractModal({
         return ['primer_nombre', 'primer_apellido', 'numero_identificacion', 'fecha_nacimiento', 'email'].includes(field)
       } else if (currentTab === 1) {
         return ['empresa_final_id', 'fecha_fin', 'salario'].includes(field)
+      } else if (currentTab === 2) {
+        return [
+          'examenes_fecha', 'contrato_fecha_confirmacion', 'arl_nombre', 'arl_fecha_confirmacion',
+          'radicado_eps', 'eps_fecha_confirmacion', 'radicado_ccf', 'caja_fecha_confirmacion',
+          'fondo_cesantias', 'cesantias_fecha_confirmacion', 'fondo_pension', 'pension_fecha_confirmacion'
+        ].includes(field)
       }
       return false
     })
@@ -373,17 +494,29 @@ export default function ContractModal({
   // Navegación libre entre pestañas
   const goToTab = (tabIndex: number) => {
     setCurrentTab(tabIndex)
+    // Scroll al inicio del modal al cambiar de pestaña
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0
+    }
   }
 
   const nextTab = () => {
     if (currentTab < tabs.length - 1) {
       setCurrentTab(currentTab + 1)
+      // Scroll al inicio del modal al cambiar de pestaña
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0
+      }
     }
   }
 
   const prevTab = () => {
     if (currentTab > 0) {
       setCurrentTab(currentTab - 1)
+      // Scroll al inicio del modal al cambiar de pestaña
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0
+      }
     }
   }
 
@@ -407,9 +540,17 @@ export default function ContractModal({
           .filter(tabIndex => errorsByTab[parseInt(tabIndex)].length > 0)
           .map(tabIndex => tabNames[parseInt(tabIndex)])
         
+        // Crear mensaje detallado de errores para debugging
+        const detailedErrors = Object.keys(errors)
+          .filter(key => key !== 'general')
+          .map(key => `${key}: ${errors[key]}`)
+        
+        console.log('🔍 ERRORES DETALLADOS:', detailedErrors)
+        console.log('📋 ERRORES POR TAB:', errorsByTab)
+        
         setErrors({
           ...errors,
-          general: `Hay campos obligatorios pendientes en: ${errorTabs.join(', ')}`
+          general: `Hay campos obligatorios pendientes en: ${errorTabs.join(', ')}. Ver consola para detalles.`
         })
       }
       return
@@ -426,7 +567,6 @@ export default function ContractModal({
         tipo_identificacion: formData.tipo_identificacion,
         numero_identificacion: formData.numero_identificacion,
         fecha_nacimiento: formData.fecha_nacimiento,
-        genero: formData.genero,
         celular: formData.celular || null,
         email: formData.email || null,
         empresa_interna: formData.empresa_interna,
@@ -444,6 +584,9 @@ export default function ContractModal({
         auxilio_salarial_concepto: formData.auxilio_salarial_concepto || null,
         auxilio_no_salarial: formData.auxilio_no_salarial || null,
         auxilio_no_salarial_concepto: formData.auxilio_no_salarial_concepto || null,
+        auxilio_transporte: formData.auxilio_transporte || null,
+        tiene_condicion_medica: formData.tiene_condicion_medica || false,
+        condicion_medica_detalle: (typeof formData.condicion_medica_detalle === 'string' && formData.condicion_medica_detalle.trim()) || null,
         beneficiario_hijo: formData.beneficiario_hijo,
         beneficiario_madre: formData.beneficiario_madre,
         beneficiario_padre: formData.beneficiario_padre,
@@ -452,17 +595,26 @@ export default function ContractModal({
         fecha_radicado: formData.fecha_radicado || null,
         programacion_cita_examenes: formData.programacion_cita_examenes,
         examenes: formData.examenes,
+        examenes_fecha: formData.examenes_fecha || null,
         solicitud_inscripcion_arl: formData.solicitud_inscripcion_arl,
-        inscripcion_arl: formData.inscripcion_arl,
+        arl_nombre: (typeof formData.arl_nombre === 'string' && formData.arl_nombre.trim()) || null,
+        arl_fecha_confirmacion: formData.arl_fecha_confirmacion || null,
         envio_contrato: formData.envio_contrato,
         recibido_contrato_firmado: formData.recibido_contrato_firmado,
+        contrato_fecha_confirmacion: formData.contrato_fecha_confirmacion || null,
         solicitud_eps: formData.solicitud_eps,
-        confirmacion_eps: formData.confirmacion_eps,
+        eps_fecha_confirmacion: formData.eps_fecha_confirmacion || null,
         envio_inscripcion_caja: formData.envio_inscripcion_caja,
-        confirmacion_inscripcion_caja: formData.confirmacion_inscripcion_caja,
+        caja_fecha_confirmacion: formData.caja_fecha_confirmacion || null,
+        solicitud_cesantias: formData.solicitud_cesantias,
+        fondo_cesantias: (typeof formData.fondo_cesantias === 'string' && formData.fondo_cesantias.trim()) || null,
+        cesantias_fecha_confirmacion: formData.cesantias_fecha_confirmacion || null,
+        solicitud_fondo_pension: formData.solicitud_fondo_pension,
+        fondo_pension: (typeof formData.fondo_pension === 'string' && formData.fondo_pension.trim()) || null,
+        pension_fecha_confirmacion: formData.pension_fecha_confirmacion || null,
         dropbox: formData.dropbox || null,
-        radicado_eps: formData.radicado_eps,
-        radicado_ccf: formData.radicado_ccf,
+        radicado_eps: (typeof formData.radicado_eps === 'string' && formData.radicado_eps.trim()) || null,
+        radicado_ccf: (typeof formData.radicado_ccf === 'string' && formData.radicado_ccf.trim()) || null,
         observacion: formData.observacion || null,
         // Agregar campos de auditoría
         ...(mode === 'create' && { created_by: (await supabase.auth.getUser()).data.user?.id }),
@@ -567,7 +719,7 @@ export default function ContractModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto">
           <div className="p-6">
             
             {/* Error general */}
@@ -717,20 +869,6 @@ export default function ContractModal({
                     )}
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Género *
-                    </label>
-                    <select
-                      value={formData.genero}
-                      onChange={(e) => !isReadOnly && handleInputChange('genero', e.target.value)}
-                      {...getInputProps('genero')}
-                    >
-                      <option value="">Seleccionar género...</option>
-                      <option value="M">Masculino</option>
-                      <option value="F">Femenino</option>
-                    </select>
-                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -766,10 +904,10 @@ export default function ContractModal({
 
             {/* Tab 2: Detalles del Contrato */}
             {currentTab === 1 && (
-              <div className="space-y-6">
+              <div className="space-y-4 lg:space-y-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Detalles del Contrato</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Empresa Interna *
@@ -789,18 +927,14 @@ export default function ContractModal({
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Empresa Cliente *
                     </label>
-                    <select
-                      value={formData.empresa_final_id}
-                      onChange={(e) => !isReadOnly && handleInputChange('empresa_final_id', e.target.value)}
-                      {...getInputProps('empresa_final_id', !!errors.empresa_final_id)}
-                    >
-                      <option value="">Seleccionar empresa...</option>
-                      {companies.map(company => (
-                        <option key={company.id} value={company.id}>
-                          {company.name} - {company.tax_id}
-                        </option>
-                      ))}
-                    </select>
+                    <CompanySelector
+                      companies={companies}
+                      selectedCompanyId={formData.empresa_final_id}
+                      onCompanySelect={(companyId) => !isReadOnly && handleInputChange('empresa_final_id', companyId)}
+                      placeholder="Buscar y seleccionar empresa cliente..."
+                      disabled={isReadOnly}
+                      error={!!errors.empresa_final_id}
+                    />
                     {errors.empresa_final_id && (
                       <p className="text-red-600 text-xs mt-1">{errors.empresa_final_id}</p>
                     )}
@@ -834,32 +968,45 @@ export default function ContractModal({
 
 
 
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="base_sena"
-                      checked={formData.base_sena}
-                      onChange={(e) => !isReadOnly && handleInputChange('base_sena', e.target.checked)}
-                      {...getCheckboxProps()}
-                    />
-                    <label htmlFor="base_sena" className="text-sm font-medium text-gray-700">
-                      Aporta al SENA
-                    </label>
+                  {/* Campo SENA mejorado con tooltip */}
+                  <div className="col-span-1 lg:col-span-2">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          id="base_sena"
+                          checked={formData.base_sena}
+                          onChange={(e) => !isReadOnly && handleInputChange('base_sena', e.target.checked)}
+                          {...getCheckboxProps()}
+                          className="w-5 h-5"
+                        />
+                        <div className="text-lg font-bold text-blue-800 flex items-center space-x-2">
+                          <span>🏛️ Aporta al SENA</span>
+                          <div className="relative group">
+                            <div className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold cursor-help">
+                              ?
+                            </div>
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-64">
+                              <div className="font-medium mb-1">ℹ️ Cargos que NO aplican al SENA:</div>
+                              <ul className="list-disc list-inside space-y-0.5">
+                                <li>Conductores</li>
+                                <li>Aprendices</li>
+                                <li>Extranjeros</li>
+                                <li>Dirección/Confianza</li>
+                                <li>Manejo</li>
+                              </ul>
+                              {/* Flecha del tooltip */}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-t-4 border-t-gray-900"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Fecha de Ingreso
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.fecha_ingreso || ''}
-                      onChange={(e) => !isReadOnly && handleInputChange('fecha_ingreso', e.target.value)}
-                      {...getInputProps('fecha_ingreso')}
-                    />
-                  </div>
-
-                  <div>
+                  {/* Tipo de Contrato - Fila completa */}
+                  <div className="col-span-1 lg:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Tipo de Contrato
                     </label>
@@ -876,25 +1023,46 @@ export default function ContractModal({
                     </select>
                   </div>
 
-                  {/* Fecha fin - solo mostrar si no es indefinido */}
-                  {formData.tipo_contrato !== 'Indefinido' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Fecha de Terminación *
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.fecha_fin || ''}
-                        onChange={(e) => !isReadOnly && handleInputChange('fecha_fin', e.target.value)}
-                        {...getInputProps('fecha_fin', !!errors.fecha_fin)}
-                      />
-                      {errors.fecha_fin && (
-                        <p className="text-red-600 text-xs mt-1">{errors.fecha_fin}</p>
-                      )}
-                    </div>
-                  )}
-
+                  {/* Fechas - Una fila para las dos fechas */}
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Fecha de Ingreso
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.fecha_ingreso || ''}
+                      onChange={(e) => !isReadOnly && handleInputChange('fecha_ingreso', e.target.value)}
+                      {...getInputProps('fecha_ingreso')}
+                    />
+                  </div>
+
+                  {/* Fecha fin SIEMPRE visible - se deshabilita si es indefinido */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Fecha de Terminación
+                      {formData.tipo_contrato === 'Indefinido' && (
+                        <span className="text-xs text-gray-500 ml-1">(No aplica)</span>
+                      )}
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.tipo_contrato === 'Indefinido' ? '' : formData.fecha_fin}
+                      onChange={(e) => !isReadOnly && handleInputChange('fecha_fin', e.target.value)}
+                      disabled={formData.tipo_contrato === 'Indefinido' || isReadOnly}
+                      {...getInputProps('fecha_fin', !!errors.fecha_fin)}
+                      className={`${getInputProps('fecha_fin', !!errors.fecha_fin).className} ${
+                        formData.tipo_contrato === 'Indefinido' 
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                          : ''
+                      }`}
+                    />
+                    {errors.fecha_fin && formData.tipo_contrato !== 'Indefinido' && (
+                      <p className="text-red-600 text-xs mt-1">{errors.fecha_fin}</p>
+                    )}
+                  </div>
+
+                  {/* Tipo de Salario - Fila completa */}
+                  <div className="col-span-1 lg:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Tipo de Salario
                     </label>
@@ -909,6 +1077,7 @@ export default function ContractModal({
                     </select>
                   </div>
 
+                  {/* Layout fijo - Salario y Auxilio Transporte siempre juntos */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Salario
@@ -930,6 +1099,25 @@ export default function ContractModal({
                     )}
                   </div>
 
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Auxilio de Transporte
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.auxilio_transporte ? formatNumberWithDots(formData.auxilio_transporte) : ''}
+                      onChange={(e) => {
+                        if (!isReadOnly) {
+                          const numericValue = parseNumberFromDots(e.target.value)
+                          handleInputChange('auxilio_transporte', numericValue)
+                        }
+                      }}
+                      {...getInputProps('auxilio_transporte')}
+                      placeholder="Ej: 140.606"
+                    />
+                  </div>
+
+                  {/* Layout fijo - Auxilios siempre numero y concepto lado a lado */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Auxilio Salarial
@@ -991,12 +1179,66 @@ export default function ContractModal({
                       placeholder="Ej: Alimentación"
                     />
                   </div>
+
+                  {/* Total Remuneración - Campo calculado */}
+                  <div className="col-span-1 lg:col-span-2">
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                      <label className="block text-sm font-semibold text-green-800 mb-2">
+                        💰 Total Remuneración
+                      </label>
+                      <div className="text-lg font-bold text-green-900">
+                        {formatCurrency(calculateTotalRemuneration(formData))}
+                      </div>
+                      <div className="text-xs text-green-700 mt-1">
+                        Salario + Aux. Salarial + Aux. No Salarial (excluye aux. transporte)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Condición Médica */}
+                <div className="bg-orange-50 p-6 rounded-xl">
+                  <h4 className="text-md font-semibold text-gray-900 mb-4">🏥 Información Médica</h4>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="tiene_condicion_medica"
+                        checked={formData.tiene_condicion_medica}
+                        onChange={(e) => !isReadOnly && handleInputChange('tiene_condicion_medica', e.target.checked)}
+                        {...getCheckboxProps()}
+                      />
+                      <label htmlFor="tiene_condicion_medica" className="text-sm font-medium text-gray-700">
+                        El empleado tiene alguna condición médica especial
+                      </label>
+                    </div>
+
+                    {/* Campo de detalle solo si tiene condición médica */}
+                    {formData.tiene_condicion_medica && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Descripción de la Condición Médica *
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={formData.condicion_medica_detalle || ''}
+                          onChange={(e) => !isReadOnly && handleInputChange('condicion_medica_detalle', e.target.value)}
+                          {...getInputProps('condicion_medica_detalle')}
+                          placeholder="Describe detalladamente la condición médica..."
+                          style={{ resize: 'none' }}
+                        />
+                        <div className="text-xs text-gray-500 mt-1">
+                          Esta información es confidencial y se usará únicamente para adaptar el puesto de trabajo.
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Beneficiarios */}
                 <div className="bg-gray-50 p-6 rounded-xl">
                   <h4 className="text-md font-semibold text-gray-900 mb-4">Beneficiarios</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Hijos
@@ -1005,9 +1247,11 @@ export default function ContractModal({
                         type="number"
                         min="0"
                         max="10"
-                        value={formData.beneficiario_hijo}
+                        value={formData.beneficiario_hijo === 0 ? '' : formData.beneficiario_hijo}
                         onChange={(e) => !isReadOnly && handleInputChange('beneficiario_hijo', parseInt(e.target.value) || 0)}
-                        {...getInputProps('beneficiario_hijo')}
+                        placeholder="0"
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        style={{ MozAppearance: 'textfield' }}
                       />
                     </div>
 
@@ -1058,7 +1302,7 @@ export default function ContractModal({
                 {/* Fechas de Inscripción Beneficiarios */}
                 <div className="bg-blue-50 p-6 rounded-xl">
                   <h4 className="text-md font-semibold text-gray-900 mb-4">Fechas de Inscripción Beneficiarios</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Fecha de Solicitud
@@ -1094,19 +1338,19 @@ export default function ContractModal({
                   <h3 className="text-lg font-semibold text-gray-900">Proceso de Onboarding</h3>
                   <div className="text-sm text-gray-600">
                     Progreso: {Math.round(
-                      ([
+                      (                      [
                         formData.programacion_cita_examenes,
-                        formData.examenes,
-                        formData.solicitud_inscripcion_arl,
-                        formData.inscripcion_arl,
+                        formData.examenes && formData.examenes_fecha,
                         formData.envio_contrato,
-                        formData.recibido_contrato_firmado,
+                        formData.recibido_contrato_firmado && formData.contrato_fecha_confirmacion,
+                        formData.solicitud_inscripcion_arl,
+                        formData.arl_nombre && formData.arl_fecha_confirmacion,
                         formData.solicitud_eps,
-                        formData.confirmacion_eps,
+                        formData.radicado_eps && formData.eps_fecha_confirmacion,
                         formData.envio_inscripcion_caja,
-                        formData.confirmacion_inscripcion_caja,
-                        formData.radicado_eps,
-                        formData.radicado_ccf
+                        formData.radicado_ccf && formData.caja_fecha_confirmacion,
+                        formData.solicitud_cesantias && formData.fondo_cesantias && formData.cesantias_fecha_confirmacion,
+                        formData.solicitud_fondo_pension && formData.fondo_pension && formData.pension_fecha_confirmacion
                       ].filter(Boolean).length / 12) * 100
                     )}%
                   </div>
@@ -1114,38 +1358,15 @@ export default function ContractModal({
 
 
 
-                {/* Checkboxes de onboarding en grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[
-                    { key: 'programacion_cita_examenes', label: 'Programación Cita Exámenes' },
-                    { key: 'examenes', label: 'Exámenes Realizados' },
-                    { key: 'solicitud_inscripcion_arl', label: 'Solicitud Inscripción ARL' },
-                    { key: 'inscripcion_arl', label: 'Inscripción ARL Confirmada' },
-                    { key: 'envio_contrato', label: 'Contrato Enviado' },
-                    { key: 'recibido_contrato_firmado', label: 'Contrato Firmado Recibido' },
-                    { key: 'solicitud_eps', label: 'Solicitud EPS' },
-                    { key: 'confirmacion_eps', label: 'EPS Confirmada' },
-                    { key: 'envio_inscripcion_caja', label: 'Envío a Caja' },
-                    { key: 'confirmacion_inscripcion_caja', label: 'Caja Confirmada' },
-                    { key: 'radicado_eps', label: 'Radicado EPS' },
-                    { key: 'radicado_ccf', label: 'Radicado CCF' }
-                  ].map((field) => (
-                    <div key={field.key} className="bg-white p-4 rounded-xl border border-gray-200 hover:border-[#87E0E0] transition-colors">
-                      <div className="flex items-center space-x-3">
-                        <input
-                          type="checkbox"
-                          id={field.key}
-                          checked={formData[field.key as keyof Contract] as boolean}
-                          onChange={(e) => !isReadOnly && handleInputChange(field.key, e.target.checked)}
-                          {...getCheckboxProps()}
-                        />
-                        <label htmlFor={field.key} className="text-sm font-medium text-gray-700 leading-relaxed cursor-pointer">
-                          {field.label}
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {/* Onboarding reorganizado por procesos */}
+                <ContractModalOnboarding
+                  formData={formData}
+                  isReadOnly={isReadOnly}
+                  handleInputChange={handleInputChange}
+                  getInputProps={getInputProps}
+                  getCheckboxProps={getCheckboxProps}
+                  errors={errors}
+                />
 
                 {/* URL de Dropbox */}
                 <div>

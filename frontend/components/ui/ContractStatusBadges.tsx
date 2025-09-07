@@ -29,7 +29,7 @@ export default function ContractStatusBadges({ contract, showDetailed = false }:
         ${aprobacionConfig.color}
         transition-all duration-200 hover:shadow-sm
       `}>
-        <span className="mr-1.5 text-sm">{aprobacionConfig.icon}</span>
+        {aprobacionConfig.icon && <span className="mr-1.5 text-sm">{aprobacionConfig.icon}</span>}
         {aprobacionConfig.label}
       </div>
 
@@ -39,7 +39,7 @@ export default function ContractStatusBadges({ contract, showDetailed = false }:
         ${vigenciaConfig.color}
         transition-all duration-200 hover:shadow-sm
       `}>
-        <span className="mr-1.5 text-sm">{vigenciaConfig.icon}</span>
+        {vigenciaConfig.icon && <span className="mr-1.5 text-sm">{vigenciaConfig.icon}</span>}
         {vigenciaConfig.label}
       </div>
 
@@ -91,14 +91,16 @@ export function ContractStatusCompact({ contract }: { contract: Contract }) {
         flex items-center px-2 py-0.5 rounded-md text-xs font-medium
         ${isDraft ? aprobacionConfig.color : vigenciaConfig.color}
       `}>
-        <span className="mr-1">
-          {isDraft ? aprobacionConfig.icon : vigenciaConfig.icon}
-        </span>
+        {(isDraft ? aprobacionConfig.icon : vigenciaConfig.icon) && (
+          <span className="mr-1">
+            {isDraft ? aprobacionConfig.icon : vigenciaConfig.icon}
+          </span>
+        )}
         {isDraft ? aprobacionConfig.label : vigenciaConfig.label}
       </div>
 
       {/* Indicador secundario si no es borrador */}
-      {!isDraft && (
+      {!isDraft && aprobacionConfig.icon && (
         <div className="text-xs text-gray-400">
           {aprobacionConfig.icon}
         </div>

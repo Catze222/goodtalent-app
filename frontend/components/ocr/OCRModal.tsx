@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { X, Camera, Upload, Loader2, CheckCircle, AlertCircle, Edit3, Save, RotateCcw } from 'lucide-react'
 import FileUploader from './FileUploader'
-import ConfidencePercentage from './ConfidencePercentage'
 
 import { useOCRExtraction } from '../../hooks/useOCRExtraction'
 
@@ -52,6 +51,7 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
   })
   const [confidence, setConfidence] = useState<any>({})
   const [numericConfidence, setNumericConfidence] = useState<Record<string, number>>({})
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   const { loading, result, error, extractData, reset, getNumericConfidence } = useOCRExtraction()
 
@@ -72,6 +72,7 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
       })
       setConfidence({})
       setNumericConfidence({})
+      setValidationErrors([])
 
       reset()
     }
@@ -158,13 +159,75 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
 
 
 
+  // Validar que todos los campos obligatorios estén llenos
+  const validateRequiredFields = () => {
+    const requiredFields = [
+      'tipo_identificacion',
+      'numero_identificacion', 
+      'primer_nombre',
+      'primer_apellido',
+      'fecha_nacimiento',
+      'fecha_expedicion_documento'
+    ]
+    
+    const missingFields = requiredFields.filter(field => 
+      !editableData[field as keyof ExtractedData] || 
+      editableData[field as keyof ExtractedData].trim() === ''
+    )
+    
+    return missingFields
+  }
+
   const handleAcceptData = () => {
+    const missingFields = validateRequiredFields()
+    
+    if (missingFields.length > 0) {
+      const fieldNames = {
+        tipo_identificacion: 'Tipo de Identificación',
+        numero_identificacion: 'Número de Identificación',
+        primer_nombre: 'Primer Nombre',
+        primer_apellido: 'Primer Apellido', 
+        fecha_nacimiento: 'Fecha de Nacimiento',
+        fecha_expedicion_documento: 'Fecha de Expedición'
+      }
+      
+      const missingFieldNames = missingFields.map(field => 
+        fieldNames[field as keyof typeof fieldNames]
+      )
+      
+      setValidationErrors(missingFieldNames)
+      return
+    }
+    
+    // Limpiar errores si todo está bien
+    setValidationErrors([])
     onDataAccepted(editableData, confidence)
     onClose()
   }
 
   const handleInputChange = (field: keyof ExtractedData, value: string) => {
     setEditableData(prev => ({ ...prev, [field]: value }))
+    
+    // Limpiar errores cuando el usuario empiece a llenar campos
+    if (validationErrors.length > 0) {
+      setValidationErrors([])
+    }
+  }
+
+  // Helper para determinar si un campo tiene error
+  const hasFieldError = (fieldName: string) => {
+    const fieldNames = {
+      'Tipo de Identificación': 'tipo_identificacion',
+      'Número de Identificación': 'numero_identificacion',
+      'Primer Nombre': 'primer_nombre',
+      'Primer Apellido': 'primer_apellido',
+      'Fecha de Nacimiento': 'fecha_nacimiento',
+      'Fecha de Expedición': 'fecha_expedicion_documento'
+    }
+    
+    return validationErrors.some(error => 
+      fieldNames[error as keyof typeof fieldNames] === fieldName
+    )
   }
 
   if (!isOpen) return null
@@ -324,24 +387,45 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
               </div>
 
+              {/* Mensaje de validación moderno */}
+              {validationErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <AlertCircle className="h-5 w-5 text-red-400" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">
+                        Campos obligatorios faltantes
+                      </h3>
+                      <div className="mt-2 text-sm text-red-700">
+                        <p>Por favor completa los siguientes campos para continuar:</p>
+                        <ul className="list-disc list-inside mt-1 space-y-1">
+                          {validationErrors.map((fieldName, index) => (
+                            <li key={index} className="font-medium">{fieldName}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Tipo de Identificación
+                      Tipo de Identificación <span className="text-red-500">*</span>
                     </label>
-                    {numericConfidence.tipo_identificacion && (
-                      <ConfidencePercentage 
-                        percentage={numericConfidence.tipo_identificacion} 
-                        compact={true}
-                        showIcon={false}
-                      />
-                    )}
                   </div>
                   <select
                     value={editableData.tipo_identificacion}
                     onChange={(e) => handleInputChange('tipo_identificacion', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent text-sm"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 text-sm transition-colors ${
+                      hasFieldError('tipo_identificacion') 
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50' 
+                        : 'border-gray-300 focus:ring-[#87E0E0] focus:border-transparent'
+                    }`}
                   >
                     <option value="">Seleccionar tipo...</option>
                     <option value="CC">Cédula de Ciudadanía</option>
@@ -353,82 +437,66 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Número de Identificación
+                      Número de Identificación <span className="text-red-500">*</span>
                     </label>
-                    {numericConfidence.numero_identificacion && (
-                      <ConfidencePercentage 
-                        percentage={numericConfidence.numero_identificacion} 
-                        compact={true}
-                        showIcon={false}
-                      />
-                    )}
                   </div>
                   <input
                     type="text"
                     value={editableData.numero_identificacion}
                     onChange={(e) => handleInputChange('numero_identificacion', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent text-sm"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 text-sm transition-colors ${
+                      hasFieldError('numero_identificacion') 
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50' 
+                        : 'border-gray-300 focus:ring-[#87E0E0] focus:border-transparent'
+                    }`}
                     placeholder="Ej: 1234567890"
                   />
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Fecha de Expedición
+                      Fecha de Expedición <span className="text-red-500">*</span>
                     </label>
-                    {numericConfidence.fecha_expedicion_documento && (
-                      <ConfidencePercentage 
-                        percentage={numericConfidence.fecha_expedicion_documento} 
-                        compact={true}
-                        showIcon={false}
-                      />
-                    )}
                   </div>
                   <input
                     type="date"
                     value={editableData.fecha_expedicion_documento}
                     onChange={(e) => handleInputChange('fecha_expedicion_documento', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent text-sm"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 text-sm transition-colors ${
+                      hasFieldError('fecha_expedicion_documento') 
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50' 
+                        : 'border-gray-300 focus:ring-[#87E0E0] focus:border-transparent'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Primer Nombre
+                      Primer Nombre <span className="text-red-500">*</span>
                     </label>
-                    {numericConfidence.primer_nombre && (
-                      <ConfidencePercentage 
-                        percentage={numericConfidence.primer_nombre} 
-                        compact={true}
-                        showIcon={false}
-                      />
-                    )}
                   </div>
                   <input
                     type="text"
                     value={editableData.primer_nombre}
                     onChange={(e) => handleInputChange('primer_nombre', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent text-sm"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 text-sm transition-colors ${
+                      hasFieldError('primer_nombre') 
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50' 
+                        : 'border-gray-300 focus:ring-[#87E0E0] focus:border-transparent'
+                    }`}
                     placeholder="Ej: Juan"
                   />
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2">
                     <label className="block text-sm font-medium text-gray-700">
                       Segundo Nombre
                     </label>
-                    {numericConfidence.segundo_nombre && (
-                      <ConfidencePercentage 
-                        percentage={numericConfidence.segundo_nombre} 
-                        compact={true}
-                        showIcon={false}
-                      />
-                    )}
                   </div>
                   <input
                     type="text"
@@ -440,39 +508,29 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Primer Apellido
+                      Primer Apellido <span className="text-red-500">*</span>
                     </label>
-                    {numericConfidence.primer_apellido && (
-                      <ConfidencePercentage 
-                        percentage={numericConfidence.primer_apellido} 
-                        compact={true}
-                        showIcon={false}
-                      />
-                    )}
                   </div>
                   <input
                     type="text"
                     value={editableData.primer_apellido}
                     onChange={(e) => handleInputChange('primer_apellido', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent text-sm"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 text-sm transition-colors ${
+                      hasFieldError('primer_apellido') 
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50' 
+                        : 'border-gray-300 focus:ring-[#87E0E0] focus:border-transparent'
+                    }`}
                     placeholder="Ej: Pérez"
                   />
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2">
                     <label className="block text-sm font-medium text-gray-700">
                       Segundo Apellido
                     </label>
-                    {numericConfidence.segundo_apellido && (
-                      <ConfidencePercentage 
-                        percentage={numericConfidence.segundo_apellido} 
-                        compact={true}
-                        showIcon={false}
-                      />
-                    )}
                   </div>
                   <input
                     type="text"
@@ -484,23 +542,20 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Fecha de Nacimiento
+                      Fecha de Nacimiento <span className="text-red-500">*</span>
                     </label>
-                    {numericConfidence.fecha_nacimiento && (
-                      <ConfidencePercentage 
-                        percentage={numericConfidence.fecha_nacimiento} 
-                        compact={true}
-                        showIcon={false}
-                      />
-                    )}
                   </div>
                   <input
                     type="date"
                     value={editableData.fecha_nacimiento}
                     onChange={(e) => handleInputChange('fecha_nacimiento', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent text-sm"
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 text-sm transition-colors ${
+                      hasFieldError('fecha_nacimiento') 
+                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500 bg-red-50' 
+                        : 'border-gray-300 focus:ring-[#87E0E0] focus:border-transparent'
+                    }`}
                   />
                 </div>
               </div>

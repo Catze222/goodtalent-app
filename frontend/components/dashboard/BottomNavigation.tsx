@@ -32,14 +32,14 @@ export default function BottomNavigation() {
       icon: Building2
     },
     {
-      name: 'Novedades',
-      href: '/dashboard/novedades',
-      icon: Bell
-    },
-    {
       name: 'Contratos',
       href: '/dashboard/contratos',
       icon: FileText
+    },
+    {
+      name: 'Novedades',
+      href: '/dashboard/novedades',
+      icon: Bell
     },
     {
       name: 'SST',

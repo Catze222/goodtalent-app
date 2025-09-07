@@ -6,9 +6,9 @@ import { supabase } from '../../../lib/supabaseClient'
 import { usePermissions } from '../../../lib/usePermissions'
 import ContractModal from '../../../components/dashboard/ContractModal'
 import ContractsTable from '../../../components/dashboard/ContractsTable'
-import ContractsFilters, { FilterEmpresa, FilterOnboarding } from '../../../components/dashboard/ContractsFilters'
+import ContractsFilters, { FilterEmpresa, FilterAprobacion, FilterVigencia, FilterOnboarding } from '../../../components/dashboard/ContractsFilters'
 import Toast from '../../../components/dashboard/Toast'
-import { Contract, Company } from '../../../types/contract'
+import { Contract, Company, getStatusVigencia, getContractStatusConfig } from '../../../types/contract'
 
 
 
@@ -28,6 +28,9 @@ export default function ContratosPage() {
   const [dataLoaded, setDataLoaded] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterEmpresa, setFilterEmpresa] = useState<FilterEmpresa>('all')
+  const [filterAprobacion, setFilterAprobacion] = useState<FilterAprobacion>('all')
+  const [filterVigencia, setFilterVigencia] = useState<FilterVigencia>('all')
+  const [filterCompanyId, setFilterCompanyId] = useState('')
   const [filterOnboarding, setFilterOnboarding] = useState<FilterOnboarding>('all')
   const [showModal, setShowModal] = useState(false)
   const [editingContract, setEditingContract] = useState<Contract | null>(null)
@@ -229,6 +232,23 @@ export default function ContratosPage() {
       (filterEmpresa === 'good' && contract.empresa_interna === 'Good') ||
       (filterEmpresa === 'cps' && contract.empresa_interna === 'CPS')
 
+    // Filtro por estado de aprobación
+    const matchesAprobacion = (() => {
+      if (filterAprobacion === 'all') return true
+      const statusConfig = getContractStatusConfig(contract)
+      return filterAprobacion === statusConfig.status_aprobacion
+    })()
+
+    // Filtro por vigencia
+    const matchesVigencia = (() => {
+      if (filterVigencia === 'all') return true
+      const statusVigencia = getStatusVigencia(contract.fecha_fin)
+      return filterVigencia === statusVigencia
+    })()
+
+    // Filtro por empresa cliente
+    const matchesCompany = filterCompanyId === '' || contract.empresa_final_id === filterCompanyId
+
     // Filtro por onboarding inteligente (todos los campos)
     const matchesOnboarding = (() => {
       switch (filterOnboarding) {
@@ -266,7 +286,7 @@ export default function ContratosPage() {
       }
     })()
 
-    return matchesSearch && matchesEmpresa && matchesOnboarding
+    return matchesSearch && matchesEmpresa && matchesAprobacion && matchesVigencia && matchesCompany && matchesOnboarding
   })
 
   // Estadísticas completas para filtros inteligentes
@@ -280,6 +300,20 @@ export default function ContratosPage() {
       return progress > 0 && progress < 100
     }).length,
     pending: contracts.filter(c => (c.contracts_onboarding_progress || 0) === 0).length,
+    
+    // Estados de aprobación
+    borrador: contracts.filter(c => {
+      const statusConfig = getContractStatusConfig(c)
+      return statusConfig.status_aprobacion === 'borrador'
+    }).length,
+    aprobado: contracts.filter(c => {
+      const statusConfig = getContractStatusConfig(c)
+      return statusConfig.status_aprobacion === 'aprobado'
+    }).length,
+    
+    // Estados de vigencia
+    activo: contracts.filter(c => getStatusVigencia(c.fecha_fin) === 'activo').length,
+    terminado: contracts.filter(c => getStatusVigencia(c.fecha_fin) === 'terminado').length,
     
     // Campos principales
     sinExamenes: contracts.filter(c => !c.examenes).length,
@@ -386,8 +420,15 @@ export default function ContratosPage() {
         setSearchTerm={setSearchTerm}
         filterEmpresa={filterEmpresa}
         setFilterEmpresa={setFilterEmpresa}
+        filterAprobacion={filterAprobacion}
+        setFilterAprobacion={setFilterAprobacion}
+        filterVigencia={filterVigencia}
+        setFilterVigencia={setFilterVigencia}
+        filterCompanyId={filterCompanyId}
+        setFilterCompanyId={setFilterCompanyId}
         filterOnboarding={filterOnboarding}
         setFilterOnboarding={setFilterOnboarding}
+        companies={companies}
         stats={stats}
       />
 

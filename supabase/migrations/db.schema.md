@@ -1,5 +1,5 @@
 # 📊 Schema de Base de Datos - GOOD Talent
-## Estado: CONSOLIDADO v2.0
+## Estado: CONSOLIDADO v2.1 - ONBOARDING SIMPLIFICADO
 *Última actualización: 2025-01-15*
 
 ## 🎯 Tablas del Sistema de Permisos
@@ -206,7 +206,6 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 | `numero_identificacion` | TEXT | Número de identificación | `1234567890` |
 | `fecha_expedicion_documento` | DATE | Fecha de expedición del documento | `2010-03-15` |
 | `fecha_nacimiento` | DATE | Fecha de nacimiento | `1990-05-15` |
-| `genero` | TEXT | Género (M, F) | `M` |
 | `celular` | TEXT | Número de celular | `+57 300 123 4567` |
 | `email` | TEXT | Correo electrónico | `juan.perez@email.com` |
 | `empresa_interna` | TEXT | Empresa interna (Good, CPS) | `Good` |
@@ -214,7 +213,7 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 | `ciudad_labora` | TEXT | Ciudad donde labora | `Bogotá` |
 | `cargo` | TEXT | Cargo del empleado | `Desarrollador` |
 | `numero_contrato_helisa` | TEXT | Número de contrato único en Helisa | `CONT-2025-001` |
-| `base_sena` | BOOLEAN | Aporta al SENA | `true` |
+| `base_sena` | BOOLEAN | Aporta al SENA (default: true) | `true` |
 | `fecha_ingreso` | DATE | Fecha de ingreso | `2025-01-15` |
 | `tipo_contrato` | TEXT | Tipo (Indefinido, Fijo, Obra, Aprendizaje) | `Indefinido` |
 | `fecha_fin` | DATE | Fecha de terminación | `2025-12-31` |
@@ -224,6 +223,9 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 | `auxilio_salarial_concepto` | TEXT | Concepto del auxilio salarial | `Transporte` |
 | `auxilio_no_salarial` | NUMERIC(14,2) | Auxilio no salarial | `100000.00` |
 | `auxilio_no_salarial_concepto` | TEXT | Concepto del auxilio no salarial | `Alimentación` |
+| `auxilio_transporte` | NUMERIC(14,2) | Auxilio de transporte mensual | `140606.00` |
+| `tiene_condicion_medica` | BOOLEAN | Indica si tiene condición médica especial | `false` |
+| `condicion_medica_detalle` | TEXT | Descripción de la condición médica | `NULL` |
 | `beneficiario_hijo` | INTEGER | Número de hijos beneficiarios | `2` |
 | `beneficiario_madre` | INTEGER | Madre beneficiaria (0/1) | `1` |
 | `beneficiario_padre` | INTEGER | Padre beneficiario (0/1) | `0` |
@@ -232,17 +234,26 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 | `fecha_radicado` | DATE | Fecha de radicado | `2025-01-12` |
 | `programacion_cita_examenes` | BOOLEAN | Programación de exámenes | `true` |
 | `examenes` | BOOLEAN | Exámenes realizados | `false` |
+| `examenes_fecha` | DATE | Fecha de exámenes médicos | `2025-01-15` |
 | `solicitud_inscripcion_arl` | BOOLEAN | Solicitud inscripción ARL | `true` |
-| `inscripcion_arl` | BOOLEAN | Inscripción ARL confirmada | `false` |
+| `arl_nombre` | TEXT | Nombre de la ARL (confirmación inferida si tiene datos) | `Positiva` |
+| `arl_fecha_confirmacion` | DATE | Fecha confirmación ARL | `2025-01-15` |
 | `envio_contrato` | BOOLEAN | Contrato enviado | `true` |
 | `recibido_contrato_firmado` | BOOLEAN | Contrato firmado recibido | `false` |
+| `contrato_fecha_confirmacion` | DATE | Fecha confirmación contrato | `2025-01-15` |
 | `solicitud_eps` | BOOLEAN | Solicitud EPS | `true` |
-| `confirmacion_eps` | BOOLEAN | EPS confirmada | `false` |
+| `eps_fecha_confirmacion` | DATE | Fecha confirmación EPS (confirmación inferida si tiene datos) | `2025-01-15` |
 | `envio_inscripcion_caja` | BOOLEAN | Envío a caja | `false` |
-| `confirmacion_inscripcion_caja` | BOOLEAN | Caja confirmada | `false` |
+| `caja_fecha_confirmacion` | DATE | Fecha confirmación caja (confirmación inferida si tiene datos) | `2025-01-15` |
+| `solicitud_cesantias` | BOOLEAN | Solicitud cesantías (confirmación inferida si tiene fondo + fecha) | `false` |
+| `fondo_cesantias` | TEXT | Fondo de cesantías | `Protección` |
+| `cesantias_fecha_confirmacion` | DATE | Fecha confirmación cesantías | `2025-01-15` |
+| `solicitud_fondo_pension` | BOOLEAN | Solicitud fondo pensión (confirmación inferida si tiene fondo + fecha) | `false` |
+| `fondo_pension` | TEXT | Fondo de pensión | `Porvenir` |
+| `pension_fecha_confirmacion` | DATE | Fecha confirmación pensión | `2025-01-15` |
 | `dropbox` | TEXT | URL de soporte en Dropbox | `https://dropbox.com/folder/contract-001` |
-| `radicado_eps` | BOOLEAN | Radicado EPS | `false` |
-| `radicado_ccf` | BOOLEAN | Radicado CCF | `false` |
+| `radicado_eps` | TEXT | Radicado EPS | `RAD-EPS-2025-001` |
+| `radicado_ccf` | TEXT | Radicado CCF | `RAD-CCF-2025-001` |
 | `observacion` | TEXT | Observaciones adicionales | `Pendiente documentos` |
 | `status_aprobacion` | TEXT | Estado de aprobación (borrador, aprobado) | `borrador` |
 | `approved_at` | TIMESTAMPTZ | Fecha de aprobación | `2025-01-15 16:30:00` |
@@ -283,7 +294,7 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 - `contracts_created_by_handle(contract)` - Handle del creador
 - `contracts_updated_by_handle(contract)` - Handle del editor
 - `contracts_full_name(contract)` - Nombre completo del empleado
-- `contracts_onboarding_progress(contract)` - Progreso de onboarding (0-100)
+- `contracts_onboarding_progress(contract)` - Progreso de onboarding (0-100) **SIMPLIFICADO**
 - `get_contract_full_status(contract)` - Estado completo con flags de permisos
 
 **Funciones del Sistema de Estados:**
@@ -295,18 +306,62 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 
 ---
 
+## 🎯 CAMBIOS v2.1 - ONBOARDING SIMPLIFICADO
+
+### ✅ **Columnas ELIMINADAS (redundantes):**
+- ❌ `inscripcion_arl` - Confirmación inferida por `arl_nombre` + `arl_fecha_confirmacion`
+- ❌ `confirmacion_eps` - Confirmación inferida por `radicado_eps` + `eps_fecha_confirmacion`
+- ❌ `confirmacion_inscripcion_caja` - Confirmación inferida por `radicado_ccf` + `caja_fecha_confirmacion`
+
+### 🔄 **Nueva Lógica de Confirmación:**
+
+**Estado de cada proceso:**
+- **🔵 No Solicitado:** Campo boolean = false
+- **🟡 Solicitado pero Sin Confirmar:** Campo boolean = true, pero sin datos adicionales
+- **🟢 Confirmado:** Campo boolean = true + datos completos (texto + fecha)
+
+**Ejemplos:**
+```sql
+-- ARL No Solicitado
+solicitud_inscripcion_arl = false
+
+-- ARL Solicitado pero Sin Confirmar  
+solicitud_inscripcion_arl = true
+arl_nombre = NULL
+arl_fecha_confirmacion = NULL
+
+-- ARL Confirmado
+solicitud_inscripcion_arl = true
+arl_nombre = 'Positiva'
+arl_fecha_confirmacion = '2025-01-15'
+```
+
+### 📊 **Función de Progreso Actualizada:**
+
+La función `contracts_onboarding_progress()` ahora calcula 12 pasos:
+- Exámenes (2): Programación + Realización
+- Contratos (2): Envío + Firma
+- ARL (2): Solicitud + Confirmación (por datos)
+- EPS (2): Solicitud + Confirmación (por datos)
+- Caja (2): Envío + Confirmación (por datos)
+- Cesantías (1): Completado (por datos)
+- Pensión (1): Completado (por datos)
+
+---
+
 ## 📋 MIGRACIÓN CONSOLIDADA
 
 La migración consolidada `00000000000000_initial_schema_consolidated.sql` contiene:
 
-✅ **Estado completo del sistema (v2.0)**
-- Todas las tablas: `permissions`, `user_permissions`, `companies`
+✅ **Estado completo del sistema (v2.1)**
+- Todas las tablas: `permissions`, `user_permissions`, `companies`, `contracts`
 - Todas las funciones helper con SECURITY DEFINER
 - Políticas RLS completas y optimizadas
 - Permisos iniciales (sin módulo employees)
 - Computed columns para handles de usuario
 - Índices optimizados para rendimiento
 - Triggers de auditoría automática
+- **NUEVO:** Onboarding simplificado sin columnas redundantes
 
 ✅ **Listo para producción**
 - Idempotente: ejecutable múltiples veces sin problemas
@@ -316,4 +371,4 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 
 ---
 
-*Sistema de permisos GOOD Talent v2.0 - Migración Consolidada*
+*Sistema de permisos GOOD Talent v2.1 - Onboarding Simplificado*
