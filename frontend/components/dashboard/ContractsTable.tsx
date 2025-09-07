@@ -861,10 +861,7 @@ export default function ContractsTable({
                           <span className="text-gray-500 text-xs font-medium">F. Nacimiento:</span>
                           <span className="text-gray-800">{formatDate(contract.fecha_nacimiento)}</span>
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-gray-500 text-xs font-medium">Género:</span>
-                          <span className="text-gray-800">{contract.genero === 'M' ? 'Masculino' : 'Femenino'}</span>
-                        </div>
+                        {/* Campo género no disponible */}
                       </div>
                     </div>
 

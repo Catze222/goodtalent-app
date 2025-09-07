@@ -151,13 +151,13 @@ export default function ContratosPage() {
           contract.programacion_cita_examenes,
           contract.examenes,
           contract.solicitud_inscripcion_arl,
-          contract.inscripcion_arl,
+          !!contract.arl_nombre && !!contract.arl_fecha_confirmacion, // confirmación ARL inferida
           contract.envio_contrato,
           contract.recibido_contrato_firmado,
           contract.solicitud_eps,
-          contract.confirmacion_eps,
+          !!contract.eps_fecha_confirmacion, // confirmación EPS inferida
           contract.envio_inscripcion_caja,
-          contract.confirmacion_inscripcion_caja,
+          !!contract.caja_fecha_confirmacion, // confirmación caja inferida
           contract.radicado_eps,
           contract.radicado_ccf
         ]
@@ -261,9 +261,9 @@ export default function ContratosPage() {
         case 'sin_examenes':
           return !contract.examenes
         case 'sin_arl':
-          return !contract.inscripcion_arl
+          return !(contract.arl_nombre && contract.arl_fecha_confirmacion)
         case 'sin_eps':
-          return !contract.confirmacion_eps
+          return !contract.eps_fecha_confirmacion
         case 'sin_contrato':
           return !contract.recibido_contrato_firmado
         
@@ -277,7 +277,7 @@ export default function ContratosPage() {
         case 'sin_solicitud_eps':
           return !contract.solicitud_eps
         case 'sin_caja':
-          return !contract.confirmacion_inscripcion_caja
+          return !contract.caja_fecha_confirmacion
         case 'sin_radicados':
           return !contract.radicado_eps && !contract.radicado_ccf
         
@@ -317,8 +317,8 @@ export default function ContratosPage() {
     
     // Campos principales
     sinExamenes: contracts.filter(c => !c.examenes).length,
-    sinArl: contracts.filter(c => !c.inscripcion_arl).length,
-    sinEps: contracts.filter(c => !c.confirmacion_eps).length,
+    sinArl: contracts.filter(c => !(c.arl_nombre && c.arl_fecha_confirmacion)).length,
+    sinEps: contracts.filter(c => !c.eps_fecha_confirmacion).length,
     sinContrato: contracts.filter(c => !c.recibido_contrato_firmado).length,
     
     // Campos adicionales
@@ -326,7 +326,7 @@ export default function ContratosPage() {
     sinSolicitudArl: contracts.filter(c => !c.solicitud_inscripcion_arl).length,
     sinEnvioContrato: contracts.filter(c => !c.envio_contrato).length,
     sinSolicitudEps: contracts.filter(c => !c.solicitud_eps).length,
-    sinCaja: contracts.filter(c => !c.confirmacion_inscripcion_caja).length,
+    sinCaja: contracts.filter(c => !c.caja_fecha_confirmacion).length,
     sinRadicados: contracts.filter(c => !c.radicado_eps && !c.radicado_ccf).length,
   }
 

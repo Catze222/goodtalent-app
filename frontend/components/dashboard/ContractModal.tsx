@@ -294,6 +294,8 @@ export default function ContractModal({
           recibido_contrato_firmado: false,
           solicitud_eps: false,
           envio_inscripcion_caja: false,
+          solicitud_cesantias: false,
+          solicitud_fondo_pension: false,
           dropbox: '',
           radicado_eps: '',
           radicado_ccf: '',
@@ -1046,10 +1048,10 @@ export default function ContractModal({
                     </label>
                     <input
                       type="date"
-                      value={formData.tipo_contrato === 'Indefinido' ? '' : formData.fecha_fin}
+                      value={formData.tipo_contrato === 'Indefinido' ? '' : formData.fecha_fin || ''}
                       onChange={(e) => !isReadOnly && handleInputChange('fecha_fin', e.target.value)}
-                      disabled={formData.tipo_contrato === 'Indefinido' || isReadOnly}
                       {...getInputProps('fecha_fin', !!errors.fecha_fin)}
+                      disabled={formData.tipo_contrato === 'Indefinido' || isReadOnly}
                       className={`${getInputProps('fecha_fin', !!errors.fecha_fin).className} ${
                         formData.tipo_contrato === 'Indefinido' 
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 

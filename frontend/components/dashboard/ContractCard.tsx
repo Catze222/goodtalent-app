@@ -220,27 +220,27 @@ export default function ContractCard({
             </button>
             
             <button
-              onClick={() => quickToggleField('inscripcion_arl', contract.inscripcion_arl)}
+              onClick={() => quickToggleField('solicitud_inscripcion_arl', contract.solicitud_inscripcion_arl)}
               disabled={updatingOnboarding}
               className={`flex items-center justify-center text-xs p-2 rounded-lg transition-colors font-medium ${
-                contract.inscripcion_arl
+                contract.solicitud_inscripcion_arl
                   ? 'bg-green-100 text-green-700 hover:bg-green-200'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               } ${updatingOnboarding ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <span>{contract.inscripcion_arl ? '✓' : '○'} ARL</span>
+              <span>{contract.solicitud_inscripcion_arl ? '✓' : '○'} ARL</span>
             </button>
 
             <button
-              onClick={() => quickToggleField('confirmacion_eps', contract.confirmacion_eps)}
+              onClick={() => quickToggleField('solicitud_eps', contract.solicitud_eps)}
               disabled={updatingOnboarding}
               className={`flex items-center justify-center text-xs p-2 rounded-lg transition-colors font-medium ${
-                contract.confirmacion_eps
+                contract.solicitud_eps
                   ? 'bg-green-100 text-green-700 hover:bg-green-200'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               } ${updatingOnboarding ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <span>{contract.confirmacion_eps ? '✓' : '○'} EPS</span>
+              <span>{contract.solicitud_eps ? '✓' : '○'} EPS</span>
             </button>
 
             <button
