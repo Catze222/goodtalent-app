@@ -399,7 +399,7 @@ export default function ContratosPage() {
   }
 
   return (
-    <div className="space-y-6 overflow-x-hidden">
+    <div className="space-y-6 h-full flex flex-col">
       
       {/* Page Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -476,7 +476,8 @@ export default function ContratosPage() {
         </div>
       ) : (
         /* Tabla con edición en masa */
-        <ContractsTable
+        <div className="flex-1 min-h-0">
+          <ContractsTable
           contracts={filteredContracts}
           onEdit={handleEdit}
           onUpdate={() => {
@@ -494,6 +495,7 @@ export default function ContratosPage() {
           }}
           onReportNovelty={handleReportNovelty}
         />
+        </div>
       )}
 
       {/* Contract Modal */}

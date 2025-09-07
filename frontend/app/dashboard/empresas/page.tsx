@@ -204,7 +204,7 @@ export default function EmpresasPage() {
   }
 
   return (
-    <div className="space-y-6 overflow-x-hidden">
+    <div className="space-y-6 h-full flex flex-col">
       
       {/* Page Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">

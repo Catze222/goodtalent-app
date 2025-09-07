@@ -53,7 +53,7 @@ export default function DashboardLayout({
         <Header />
         
         {/* Page Content */}
-        <main className="flex-1 p-4 lg:p-6 overflow-auto pb-20 lg:pb-6">
+        <main className="flex-1 p-4 lg:p-6 pb-20 lg:pb-6">
           {children}
         </main>
       </div>
