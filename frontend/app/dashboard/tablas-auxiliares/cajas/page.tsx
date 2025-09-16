@@ -9,10 +9,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePermissions } from '@/lib/usePermissions'
 import { supabase } from '@/lib/supabaseClient'
-import { Building, ArrowLeft, Edit, Trash2, MapPin } from 'lucide-react'
+import { Building, ArrowLeft, Edit, Power, PowerOff, MapPin } from 'lucide-react'
 import ResponsiveDataTable from '@/components/ui/ResponsiveDataTable'
 import AuxiliaryTableModal from '@/components/ui/AuxiliaryTableModal'
-import DeleteConfirmModal from '@/components/ui/DeleteConfirmModal'
+import ActivateDeactivateModal from '@/components/ui/ActivateDeactivateModal'
 import Toast from '@/components/dashboard/Toast'
 
 interface CajaCompensacion {
@@ -20,6 +20,7 @@ interface CajaCompensacion {
   nombre: string
   ciudad_id: string
   ciudad_nombre?: string
+  es_activa: boolean
   created_at: string
   updated_at: string
 }
@@ -39,11 +40,11 @@ export default function CajasPage() {
   // Modales
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showActivateDeactivateModal, setShowActivateDeactivateModal] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<CajaCompensacion | null>(null)
   
   // Estados de carga específicos
-  const [deleting, setDeleting] = useState(false)
+  const [updating, setUpdating] = useState(false)
   
   // Toast
   const [toast, setToast] = useState<{
@@ -74,6 +75,7 @@ export default function CajasPage() {
       const { data, error } = await supabase
         .from('ciudades')
         .select('id, nombre')
+        .eq('es_activa', true)
         .order('nombre', { ascending: true })
 
       if (error) {
@@ -224,33 +226,45 @@ export default function CajasPage() {
     showToast('Caja de compensación actualizada exitosamente', 'success')
   }
 
-  // Eliminar caja
-  const handleDelete = async () => {
+  // Activar/Desactivar caja
+  const handleActivateDeactivate = async () => {
     if (!selectedRecord) return
 
-    setDeleting(true)
+    const { data: session } = await supabase.auth.getSession()
+    const userId = session.session?.user?.id
+
+    if (!userId) {
+      showToast('Usuario no autenticado', 'error')
+      return
+    }
+
+    setUpdating(true)
     try {
+      const newStatus = !selectedRecord.es_activa
       const { error } = await supabase
         .from('cajas_compensacion')
-        .delete()
+        .update({
+          es_activa: newStatus,
+          updated_by: userId
+        })
         .eq('id', selectedRecord.id)
 
       if (error) {
-        console.error('Error deleting caja:', error)
+        console.error('Error updating caja:', error)
         throw new Error(error.message)
       }
 
       // Clear cache and reload
       localStorage.removeItem('cajas_compensacion_cache')
       await loadData()
-      showToast('Caja de compensación eliminada exitosamente', 'success')
-      setShowDeleteModal(false)
+      showToast(`Caja de compensación ${newStatus ? 'activada' : 'desactivada'} exitosamente`, 'success')
+      setShowActivateDeactivateModal(false)
       setSelectedRecord(null)
     } catch (error: any) {
-      console.error('Error deleting caja:', error)
-      showToast(error.message || 'Error al eliminar la caja de compensación', 'error')
+      console.error('Error updating caja:', error)
+      showToast(error.message || 'Error al actualizar la caja de compensación', 'error')
     } finally {
-      setDeleting(false)
+      setUpdating(false)
     }
   }
 
@@ -271,6 +285,21 @@ export default function CajasPage() {
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
           <MapPin className="w-3 h-3 mr-1" />
           {value}
+        </span>
+      )
+    },
+    {
+      key: 'es_activa',
+      label: 'Estado',
+      sortable: true,
+      mobileShow: true,
+      render: (value: boolean) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          value 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-gray-100 text-gray-800'
+        }`}>
+          {value ? 'Activa' : 'Inactiva'}
         </span>
       )
     },
@@ -297,15 +326,26 @@ export default function CajasPage() {
       show: () => canEdit
     },
     {
-      key: 'delete',
-      label: 'Eliminar',
-      icon: Trash2,
-      color: 'red' as const,
+      key: 'deactivate',
+      label: 'Desactivar',
+      icon: PowerOff,
+      color: 'orange' as const,
       onClick: (record: CajaCompensacion) => {
         setSelectedRecord(record)
-        setShowDeleteModal(true)
+        setShowActivateDeactivateModal(true)
       },
-      show: () => canDelete
+      show: (record: CajaCompensacion) => canDelete && record.es_activa
+    },
+    {
+      key: 'activate',
+      label: 'Activar',
+      icon: Power,
+      color: 'green' as const,
+      onClick: (record: CajaCompensacion) => {
+        setSelectedRecord(record)
+        setShowActivateDeactivateModal(true)
+      },
+      show: (record: CajaCompensacion) => canDelete && !record.es_activa
     }
   ]
 
@@ -412,18 +452,18 @@ export default function CajasPage() {
         onSubmit={handleEdit}
       />
 
-      {/* Modal Eliminar */}
-      <DeleteConfirmModal
-        isOpen={showDeleteModal}
+      {/* Modal Activar/Desactivar */}
+      <ActivateDeactivateModal
+        isOpen={showActivateDeactivateModal}
         onClose={() => {
-          setShowDeleteModal(false)
+          setShowActivateDeactivateModal(false)
           setSelectedRecord(null)
         }}
-        onConfirm={handleDelete}
-        title="Eliminar Caja de Compensación"
-        message="¿Estás seguro de que deseas eliminar esta caja de compensación?"
+        onConfirm={handleActivateDeactivate}
         recordName={selectedRecord?.nombre}
-        loading={deleting}
+        isActive={selectedRecord?.es_activa || false}
+        loading={updating}
+        entityType="caja de compensación"
       />
 
       {/* Toast */}

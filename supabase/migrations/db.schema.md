@@ -1,6 +1,10 @@
 # 📊 Schema de Base de Datos - GOOD Talent
-## Estado: CONSOLIDADO v2.1 - ONBOARDING SIMPLIFICADO
+## Estado: CONSOLIDADO v3.0 - MIGRACIÓN UNIFICADA COMPLETA
 *Última actualización: 2025-01-15*
+
+> **🚀 NUEVA MIGRACIÓN CONSOLIDADA:** Se ha creado una migración unificada que incluye todo el sistema.
+> **Archivos:** `00000000000000_initial_complete_schema.sql` + 3 archivos de continuación
+> **Contenido:** Permisos + Empresas + Contratos + Tablas Auxiliares + Líneas de Negocio + Datos Iniciales
 
 ## 🎯 Tablas del Sistema de Permisos
 
@@ -98,6 +102,9 @@
 | `dashboard` | `view` | Acceso al dashboard |
 | `reports` | `view`, `create`, `export` | Reportes y exportaciones |
 | `tablas_auxiliares` | `view`, `create`, `edit`, `delete` | Gestión de tablas auxiliares administrativas |
+| `lineas_negocio` | `view`, `create`, `edit`, `delete` | Gestión del catálogo de líneas de negocio |
+| `linea_negocio_responsables` | `view`, `create`, `edit`, `delete` | Asignación de responsables a líneas de negocio |
+| `empresa_lineas_negocio` | `view`, `create`, `edit`, `delete` | Asignación de líneas de negocio a empresas |
 
 **NOTA:** El módulo `employees` fue removido del sistema. Todos los permisos relacionados con empleados han sido eliminados.
 
@@ -203,22 +210,22 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 | `segundo_nombre` | TEXT | Segundo nombre (opcional) | `Carlos` |
 | `primer_apellido` | TEXT | Primer apellido del empleado | `Pérez` |
 | `segundo_apellido` | TEXT | Segundo apellido (opcional) | `González` |
-| `tipo_identificacion` | TEXT | Tipo de documento (CC, CE, Pasaporte, PEP, Otro) | `CC` |
+| `tipo_identificacion` | TEXT | Tipo de documento (texto libre) | `CC`, `Cédula de Ciudadanía` |
 | `numero_identificacion` | TEXT | Número de identificación | `1234567890` |
 | `fecha_expedicion_documento` | DATE | Fecha de expedición del documento | `2010-03-15` |
 | `fecha_nacimiento` | DATE | Fecha de nacimiento | `1990-05-15` |
 | `celular` | TEXT | Número de celular | `+57 300 123 4567` |
 | `email` | TEXT | Correo electrónico | `juan.perez@email.com` |
-| `empresa_interna` | TEXT | Empresa interna (Good, CPS) | `Good` |
+| `empresa_interna` | TEXT | Empresa interna (texto libre) | `Good`, `Temporal`, `Outsourcing` |
 | `empresa_final_id` | UUID (FK) | Empresa cliente final | `company-uuid` |
 | `ciudad_labora` | TEXT | Ciudad donde labora | `Bogotá` |
 | `cargo` | TEXT | Cargo del empleado | `Desarrollador` |
 | `numero_contrato_helisa` | TEXT | Número de contrato único en Helisa | `CONT-2025-001` |
 | `base_sena` | BOOLEAN | Aporta al SENA (default: true) | `true` |
 | `fecha_ingreso` | DATE | Fecha de ingreso | `2025-01-15` |
-| `tipo_contrato` | TEXT | Tipo (Indefinido, Fijo, Obra, Aprendizaje) | `Indefinido` |
+| `tipo_contrato` | TEXT | Tipo de contrato (texto libre) | `Indefinido`, `Término Fijo`, `Por Obra` |
 | `fecha_fin` | DATE | Fecha de terminación | `2025-12-31` |
-| `tipo_salario` | TEXT | Tipo (Integral, Ordinario) | `Ordinario` |
+| `tipo_salario` | TEXT | Tipo de salario (texto libre) | `Ordinario`, `Integral`, `Mixto` |
 | `salario` | NUMERIC(14,2) | Salario base | `3500000.00` |
 | `auxilio_salarial` | NUMERIC(14,2) | Auxilio salarial | `150000.00` |
 | `auxilio_salarial_concepto` | TEXT | Concepto del auxilio salarial | `Transporte` |
@@ -277,6 +284,7 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 - Beneficiarios: madre, padre, cónyuge solo pueden ser 0 o 1
 - Estado de aprobación: solo puede ser 'borrador' o 'aprobado'
 - Lógica de aprobación: una vez aprobado no se puede editar ni eliminar
+- **ACTUALIZADO:** Los campos dropdown ahora permiten texto libre (sin restricciones CHECK)
 
 **Índices:**
 - `idx_contracts_numero_contrato_helisa` - Búsqueda por número de contrato
@@ -380,6 +388,7 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 |---------|------|-------------|---------|
 | `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440002` |
 | `nombre` | TEXT | Nombre de la ciudad | `Bogotá` |
+| `es_activa` | BOOLEAN | Si está disponible para nuevas asignaciones | `true` |
 | `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
 | `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
 | `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
@@ -389,6 +398,9 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 - `UNIQUE(nombre)` - Nombre único por ciudad
 - Validación de nombre no vacío
 
+**Soft Delete:**
+- `es_activa = false` desactiva la ciudad pero preserva historial
+
 ### 6. `cajas_compensacion` – Cajas de Compensación Familiar
 
 | Columna | Tipo | Descripción | Ejemplo |
@@ -396,6 +408,7 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 | `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440003` |
 | `nombre` | TEXT | Nombre de la caja | `Colsubsidio` |
 | `ciudad_id` | UUID (FK) | Ciudad donde opera | `ciudad-uuid` |
+| `es_activa` | BOOLEAN | Si está disponible para nuevas asignaciones | `true` |
 | `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
 | `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
 | `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
@@ -408,12 +421,16 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 - `UNIQUE(nombre, ciudad_id)` - Una caja por nombre y ciudad
 - Validación de nombre no vacío
 
+**Soft Delete:**
+- `es_activa = false` desactiva la caja pero preserva historial
+
 ### 7. `arls` – Administradoras de Riesgos Laborales
 
 | Columna | Tipo | Descripción | Ejemplo |
 |---------|------|-------------|---------|
 | `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440004` |
 | `nombre` | TEXT | Nombre de la ARL | `ARL SURA` |
+| `es_activa` | BOOLEAN | Si está disponible para nuevas asignaciones | `true` |
 | `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
 | `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
 | `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
@@ -423,12 +440,16 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 - `UNIQUE(nombre)` - Nombre único por ARL
 - Validación de nombre no vacío
 
+**Soft Delete:**
+- `es_activa = false` desactiva la ARL pero preserva historial
+
 ### 8. `fondos_cesantias` – Fondos de Cesantías
 
 | Columna | Tipo | Descripción | Ejemplo |
 |---------|------|-------------|---------|
 | `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440005` |
 | `nombre` | TEXT | Nombre del fondo | `Porvenir` |
+| `es_activa` | BOOLEAN | Si está disponible para nuevas asignaciones | `true` |
 | `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
 | `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
 | `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
@@ -437,6 +458,9 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 **Restricciones:**
 - `UNIQUE(nombre)` - Nombre único por fondo
 - Validación de nombre no vacío
+
+**Soft Delete:**
+- `es_activa = false` desactiva el fondo pero preserva historial
 
 ### 9. `fondos_pension` – Fondos de Pensión
 
@@ -444,6 +468,7 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 |---------|------|-------------|---------|
 | `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440006` |
 | `nombre` | TEXT | Nombre del fondo | `Protección` |
+| `es_activa` | BOOLEAN | Si está disponible para nuevas asignaciones | `true` |
 | `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
 | `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
 | `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
@@ -453,12 +478,16 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 - `UNIQUE(nombre)` - Nombre único por fondo
 - Validación de nombre no vacío
 
+**Soft Delete:**
+- `es_activa = false` desactiva el fondo pero preserva historial
+
 ### 10. `eps` – Entidades Promotoras de Salud
 
 | Columna | Tipo | Descripción | Ejemplo |
 |---------|------|-------------|---------|
 | `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440007` |
 | `nombre` | TEXT | Nombre de la EPS | `EPS Sura` |
+| `es_activa` | BOOLEAN | Si está disponible para nuevas asignaciones | `true` |
 | `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
 | `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
 | `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
@@ -467,6 +496,9 @@ La migración consolidada `00000000000000_initial_schema_consolidated.sql` conti
 **Restricciones:**
 - `UNIQUE(nombre)` - Nombre único por EPS
 - Validación de nombre no vacío
+
+**Soft Delete:**
+- `es_activa = false` desactiva la EPS pero preserva historial
 
 ## 🔐 Seguridad RLS - Tablas Auxiliares
 
@@ -491,4 +523,255 @@ Las tablas auxiliares incluyen datos iniciales del sistema colombiano:
 
 ---
 
-*Sistema de permisos GOOD Talent v2.2 - Con Tablas Auxiliares*
+## 🏢 Sistema de Líneas de Negocio
+
+### 11. `lineas_negocio` – Catálogo de Líneas de Negocio
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440008` |
+| `nombre` | TEXT | Nombre de la línea de negocio | `Legal Laboral` |
+| `descripcion` | TEXT | Descripción detallada del servicio | `Asesoría jurídica especializada en derecho laboral` |
+| `es_activa` | BOOLEAN | Si está disponible para asignar | `true` |
+| `color_hex` | TEXT | Color para UI (formato hexadecimal) | `#004C4C` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+
+**Relaciones:**
+- `created_by` → `auth.users(id)`
+- `updated_by` → `auth.users(id)`
+
+**Restricciones:**
+- `UNIQUE(nombre)` - Nombre único por línea de negocio
+- Validación de nombre y descripción no vacíos
+- Validación de formato color hexadecimal (#RRGGBB)
+
+### 12. `linea_negocio_responsables` – Responsables de Líneas de Negocio
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440009` |
+| `linea_negocio_id` | UUID (FK) | Línea de negocio asignada | `linea-uuid` |
+| `user_id` | UUID (FK) | Usuario responsable | `user-uuid` |
+| `es_asignado_principal` | BOOLEAN | Si es el responsable principal | `true` |
+| `fecha_asignacion` | TIMESTAMPTZ | Fecha de asignación | `2025-01-15 10:00:00` |
+| `asignado_por` | UUID (FK) | Usuario que realizó la asignación | `admin-uuid` |
+| `es_activo` | BOOLEAN | Si la asignación está activa | `true` |
+
+**Relaciones:**
+- `linea_negocio_id` → `lineas_negocio(id)` ON DELETE CASCADE
+- `user_id` → `auth.users(id)` ON DELETE CASCADE
+- `asignado_por` → `auth.users(id)`
+
+**Restricciones:**
+- `UNIQUE(linea_negocio_id, user_id)` - Un responsable por línea de negocio
+- Lógica de asignación: siempre debe haber un asignado principal por línea
+
+### 13. `empresa_lineas_negocio` – Líneas de Negocio por Empresa
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440010` |
+| `empresa_id` | UUID (FK) | Empresa cliente | `company-uuid` |
+| `linea_negocio_id` | UUID (FK) | Línea de negocio contratada | `linea-uuid` |
+| `fecha_asignacion` | TIMESTAMPTZ | Fecha de asignación | `2025-01-15 10:00:00` |
+| `asignado_por` | UUID (FK) | Usuario que realizó la asignación | `admin-uuid` |
+| `es_activa` | BOOLEAN | Si el servicio está activo | `true` |
+
+**Relaciones:**
+- `empresa_id` → `companies(id)` ON DELETE CASCADE
+- `linea_negocio_id` → `lineas_negocio(id)` ON DELETE CASCADE
+- `asignado_por` → `auth.users(id)`
+
+**Restricciones:**
+- `UNIQUE(empresa_id, linea_negocio_id)` - Una línea por empresa
+- Lógica de negocio: una empresa puede tener múltiples líneas de negocio
+
+## 🔐 Seguridad RLS - Líneas de Negocio
+
+**Todas las tablas de líneas de negocio tienen:**
+- **Ver:** `has_permission(auth.uid(), '[tabla]', 'view')`
+- **Crear:** `has_permission(auth.uid(), '[tabla]', 'create')`
+- **Editar:** `has_permission(auth.uid(), '[tabla]', 'edit')`
+- **Eliminar:** `has_permission(auth.uid(), '[tabla]', 'delete')`
+
+**Triggers:**
+- `trigger_lineas_negocio_updated_at` - Actualiza automáticamente `updated_at` y `updated_by`
+
+## 📊 Funciones Helper - Líneas de Negocio
+
+- `get_linea_negocio_responsables(linea_id)` - Obtiene responsables activos de una línea
+- `get_empresa_lineas_negocio(empresa_id)` - Obtiene líneas de negocio de una empresa
+- `get_empresas_por_linea_negocio(linea_id)` - Obtiene empresas con una línea específica
+
+## 📋 Datos Precargados - Líneas de Negocio
+
+Las líneas de negocio incluyen datos iniciales del sistema:
+- **Legal Laboral** - Asesoría jurídica especializada (#004C4C)
+- **Riesgos Laborales** - Gestión de SST y prevención (#065C5C)
+- **Payroll** - Administración de nómina completa (#0A6A6A)
+- **Selección** - Reclutamiento y evaluación de talento (#87E0E0)
+- **Contratación y Administración** - Gestión integral de personal (#5FD3D2)
+- **Temporales** - Suministro de personal temporal (#58BFC2)
+
+---
+
+## 🚀 MIGRACIÓN CONSOLIDADA v3.0
+
+### Archivos de Migración Unificada
+
+El sistema ahora utiliza **4 archivos de migración consolidados** que incluyen todo el schema:
+
+1. **`00000000000000_initial_complete_schema.sql`** - Schema principal
+   - ✅ Sistema de permisos (permissions, user_permissions)
+   - ✅ Tabla de empresas (companies) con auditoría
+   - ✅ Tabla de contratos (contracts) v2.1 completa
+   - ✅ Tablas auxiliares (6 tablas)
+   - ✅ Sistema de líneas de negocio (3 tablas)
+   - ✅ Índices y foreign keys
+   - ✅ Triggers de auditoría
+
+2. **`00000000000001_initial_complete_schema_part2.sql`** - Funciones y lógica
+   - ✅ Funciones helper con SECURITY DEFINER
+   - ✅ Computed columns para companies y contracts
+   - ✅ Funciones específicas de contratos
+   - ✅ Funciones de líneas de negocio
+   - ✅ Habilitación de RLS
+   - ✅ Políticas principales
+
+3. **`00000000000002_initial_complete_schema_part3.sql`** - RLS y permisos
+   - ✅ Políticas RLS para tablas auxiliares
+   - ✅ Políticas optimizadas para líneas de negocio
+   - ✅ Permisos iniciales del sistema (40+ permisos)
+   - ✅ Grants para rol authenticated
+
+4. **`00000000000003_initial_complete_schema_data.sql`** - Datos y verificación
+   - ✅ Datos iniciales del sistema colombiano
+   - ✅ 29 ciudades + 39 cajas de compensación
+   - ✅ 8 ARLs + 5 fondos + 28 EPS
+   - ✅ 6 líneas de negocio predefinidas
+   - ✅ Comentarios completos
+   - ✅ Verificaciones post-migración
+
+### Beneficios de la Consolidación
+
+✅ **Idempotencia:** Ejecutable múltiples veces sin errores  
+✅ **Completitud:** Todo el sistema en una sola migración  
+✅ **Optimización:** RLS flexible para mejor usabilidad  
+✅ **Datos:** Precargado con información del sistema colombiano  
+✅ **Documentación:** Comentarios completos en todas las funciones  
+✅ **Verificación:** Checks automáticos post-migración  
+✅ **Vista Segura:** Vista `usuarios_basicos` para resolver problemas RLS del frontend  
+
+### Instrucciones de Uso
+
+```bash
+# 1. Borrar base de datos actual
+supabase db reset
+
+# 2. Ejecutar migración consolidada
+supabase db push
+
+# 3. Crear primer super admin
+supabase sql --db-url="your-db-url" --file=- <<EOF
+SELECT create_super_admin('tu-user-id-aqui');
+EOF
+
+# 4. Verificar funcionamiento
+supabase sql --db-url="your-db-url" --file=- <<EOF
+SELECT my_permissions();
+EOF
+```
+
+### Archivos Antiguos (Ya NO Usar)
+
+Los siguientes archivos han sido **consolidados** y ya no se deben usar:
+- ❌ `20250115000008_add_auxiliary_tables.sql`
+- ❌ `20250115000009_add_business_lines.sql`
+- ❌ `20250115000010_fix_business_lines_rls.sql`
+- ❌ `20250115000011_fix_business_lines_issues.sql`
+- ❌ `20250115000012_fix_rls_and_remove_color.sql`
+- ❌ `20250115000013_fix_business_lines_company_permissions.sql`
+- ❌ `20250115000014_comprehensive_business_lines_fix.sql`
+- ❌ `20250115000015_add_business_lines_assignment_function.sql`
+- ❌ `20250115999999_consolidated_schema_complete.sql`
+
+### Estado Final del Sistema
+
+**📊 Tablas:** 13 tablas principales con RLS habilitado  
+**🔐 Permisos:** 40+ permisos granulares para todos los módulos  
+**🏢 Empresas:** Gestión completa con líneas de negocio  
+**📋 Contratos:** Sistema completo v2.1 con onboarding simplificado  
+**🗂️ Auxiliares:** 6 tablas con datos del sistema colombiano  
+**🎯 Líneas:** 6 líneas de negocio predefinidas con responsables  
+**⚡ Performance:** Índices optimizados para consultas frecuentes  
+**🔄 Auditoría:** Triggers automáticos en todas las tablas  
+
+---
+
+## 🔢 Tabla de Parámetros Anuales
+
+### 12. `parametros_anuales` – Parámetros que Cambian Año a Año
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440009` |
+| `tipo_parametro` | TEXT | Tipo de parámetro | `salario_minimo`, `auxilio_transporte` |
+| `año` | INTEGER | Año de vigencia | `2024`, `2025` |
+| `valor_numerico` | DECIMAL(15,4) | Valor numérico del parámetro | `1300000`, `4.0`, `162000` |
+| `valor_texto` | TEXT | Valor texto/JSON del parámetro | `false`, `{"0-1160000": 0}` |
+| `tipo_dato` | TEXT | Tipo de dato del valor | `numerico`, `texto`, `booleano`, `json` |
+| `unidad` | TEXT | Unidad del valor | `pesos`, `porcentaje`, `dias` |
+| `descripcion` | TEXT | Descripción del parámetro | `Salario mínimo legal vigente` |
+| `es_activo` | BOOLEAN | Si está activo | `true` |
+| `fecha_vigencia_inicio` | DATE | Inicio de vigencia | `2024-01-01` |
+| `fecha_vigencia_fin` | DATE | Fin de vigencia | `2024-12-31` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-15 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-15 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+
+**Restricciones:**
+- `UNIQUE(tipo_parametro, año)` - Un parámetro por año
+- Validación de año entre 2020-2050
+- Validación de valor según tipo_dato
+- Nombre de tipo_parametro no vacío
+
+**Ejemplos de Uso:**
+```sql
+-- Obtener salario mínimo 2024
+SELECT * FROM get_parametro_anual('salario_minimo', 2024);
+
+-- Obtener auxilio de transporte año actual
+SELECT * FROM get_parametro_anual('auxilio_transporte');
+```
+
+**Tipos de Parámetros Disponibles:**
+- `salario_minimo` - Salario mínimo legal vigente
+- `auxilio_transporte` - Auxilio de transporte
+- `salario_integral` - Límite mínimo salario integral  
+- `uvt` - Unidad de Valor Tributario
+
+**Soft Delete:**
+- `es_activo = false` desactiva el parámetro pero preserva historial
+
+**RLS:**
+- Mismas políticas que tablas auxiliares (`tablas_auxiliares.*`)
+
+---
+
+## 📋 Historial de Cambios Recientes
+
+### 2025-01-15 - Migración 00000000000009
+- ✅ **Campos dropdown liberados**: Eliminadas restricciones CHECK de:
+  - `tipo_identificacion` - Ahora acepta cualquier texto
+  - `empresa_interna` - Ahora acepta cualquier texto  
+  - `tipo_contrato` - Ahora acepta cualquier texto
+  - `tipo_salario` - Ahora acepta cualquier texto
+- 🎯 **Propósito**: Permitir flexibilidad en los nombres mostrados en dropdowns
+
+---
+
+*Sistema consolidado GOOD Talent v3.0 - Migración Unificada Completa*

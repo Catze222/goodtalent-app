@@ -215,31 +215,63 @@ export class GeminiClient {
    * Construye el prompt optimizado para múltiples imágenes
    */
   private buildMultiImagePrompt(): string {
-    return `Eres un experto extractor de datos de documentos de identidad colombianos. Te voy a enviar múltiples imágenes de cédulas (frente y reverso, o un PDF con múltiples páginas).
+    return `Eres un experto extractor de datos de documentos de identidad colombianos con especialización en OCR de alta precisión. Te voy a enviar múltiples imágenes de cédulas (frente y reverso, o un PDF con múltiples páginas).
 
-REGLAS CRÍTICAS:
-1. **NÚMERO DE DOCUMENTO**: Solo extrae el número de cédula del FRENTE (donde está la foto de la persona). NUNCA del reverso, que tiene códigos de barras que NO son el número de documento.
-2. **NOMBRES Y APELLIDOS**: Solo están en el frente (donde está la foto).
-3. **FECHAS**: Pueden estar en frente o reverso, usa la información más completa y confiable.
+ANÁLISIS INICIAL - IDENTIFICA EL DOCUMENTO:
+1. Localiza el FRENTE (imagen con foto de la persona)
+2. Identifica el tipo: "CÉDULA DE CIUDADANÍA" (CC) o "Cédula de Extranjería" (CE)
+3. Determina si es formato antiguo o nuevo (NUIP)
 
-INSTRUCCIONES DETALLADAS:
+NÚMERO DE DOCUMENTO - INSTRUCCIONES CRÍTICAS DE OCR:
 
-Tipo de Documento:
-Busca "CÉDULA DE CIUDADANÍA" (CC) o "Cédula de Extranjería" (CE) en el título principal.
+📍 UBICACIÓN ESPECÍFICA:
+- Cédulas NUEVAS: Buscar "NUIP" seguido del número (ej: NUIP 2.000.017.701)
+- Cédulas ANTIGUAS: Número grande arriba del nombre (ej: 1.020.742.434)
+- Extranjería: "No:" seguido del número (ej: No. 379929)
 
-Número de Documento:
-⚠️ CRÍTICO: Solo busca el número en la imagen del FRENTE (donde hay una foto de la persona).
-- Generalmente etiquetado como "NUIP", "Número No.", o es el número más destacado.
-- IGNORA completamente códigos de barras del reverso.
-- Solo dígitos, sin puntos ni espacios.
+🔍 TÉCNICAS OCR PARA NÚMEROS:
+1. SOLO del FRENTE (donde está la foto) - NUNCA del reverso
+2. IGNORA códigos de barras, números pequeños (altura: 1.78), fechas
+3. Longitud válida: 6-11 dígitos (ej: 51554033, 1020742434, 2000017701)
+4. Elimina puntos y espacios: 1.020.742.434 → 1020742434
 
-Nombres y Apellidos:
-Solo están en el frente. Busca "NOMBRES" y "APELLIDOS". Separa primer y segundo nombre/apellido.
+⚠️ DÍGITOS PROBLEMÁTICOS - VERIFICA CUIDADOSAMENTE:
+- 4 vs 1: El 4 tiene líneas más gruesas y ángulos
+- 8 vs 6: El 8 tiene dos círculos cerrados completos
+- 0 vs O: Los números son más regulares y uniformes
+- 5 vs S: El 5 es más angular, la S es más curva
+- 2 vs Z: El 2 tiene base horizontal, la Z es más diagonal
 
-Fechas:
-- Fecha de nacimiento: Busca "Fecha de nacimiento" (puede estar en frente o reverso).
-- Fecha de expedición: Busca "Fecha de expedición" o "Fecha y lugar de expedición".
-- Convierte siempre al formato YYYY-MM-DD.
+✅ VALIDACIÓN DEL NÚMERO:
+- Debe contener SOLO dígitos (0-9)
+- Longitud entre 6-11 caracteres
+- No puede empezar con 0
+- Si encuentras letras mezcladas, es incorrecto
+
+NOMBRES Y APELLIDOS:
+- Busca etiquetas: "APELLIDOS", "NOMBRES"
+- Formato típico: "APELLIDO1 APELLIDO2" en una línea, "NOMBRES" en otra
+- Extrae principalmente texto IMPRESO/TIPOGRAFIADO
+- Si no hay segundo nombre visible, déjalo como null
+- NO inventes nombres que no están claramente escritos
+
+FECHAS - BUSCA CUIDADOSAMENTE:
+- Fecha de nacimiento: Busca "Fecha de nacimiento" o similar
+- Fecha de expedición: Busca "Fecha de expedición", "Fecha y lugar de expedición", o fechas cerca de firmas/sellos
+- Formatos posibles: DD/MM/YYYY, DD-MM-YYYY, DD MMM YYYY, YYYY/MM/DD
+- Convierte TODO a formato: YYYY-MM-DD
+- Si encuentras múltiples fechas, usa contexto para identificar cuál es cuál
+
+MESES EN ESPAÑOL:
+ENE=01, FEB=02, MAR=03, ABR=04, MAY=05, JUN=06, 
+JUL=07, AGO=08, SEP=09, OCT=10, NOV=11, DIC=12
+
+PROCESO DE EXTRACCIÓN:
+1. Analiza cada imagen cuidadosamente
+2. Para el NÚMERO: Examina dígito por dígito, verifica coherencia
+3. Para NOMBRES: Solo texto impreso, ignora manuscritos
+4. Para FECHAS: Identifica formato y convierte correctamente
+5. Asigna confianza basada en claridad visual
 
 Formato de Salida:
 Responde ÚNICAMENTE con un JSON válido:
@@ -262,11 +294,17 @@ Responde ÚNICAMENTE con un JSON válido:
 }
 
 Niveles de confianza (0-100):
-- 90-100: Completamente seguro
-- 70-89: Muy probable
-- 50-69: Moderadamente seguro
-- 30-49: Poco seguro
-- 0-29: Muy incierto
+- 90-100: Texto completamente claro y validado
+- 70-89: Muy probable, pequeñas dudas en 1-2 caracteres
+- 50-69: Moderadamente seguro, algunos caracteres ambiguos
+- 30-49: Poco seguro, varios caracteres dudosos
+- 0-29: Muy incierto, texto borroso o dañado
+
+EJEMPLOS DE NÚMEROS VÁLIDOS:
+✅ 51554033 (8 dígitos)
+✅ 1020742434 (10 dígitos) 
+✅ 2000017701 (10 dígitos)
+✅ 379929 (6 dígitos - extranjería)
 
 Si un campo es null, su confianza debe ser 0. Analiza todas las imágenes y combina la información más precisa y confiable. No agregues texto adicional fuera del JSON.`
   }
@@ -275,27 +313,63 @@ Si un campo es null, su confianza debe ser 0. Analiza todas las imágenes y comb
    * Construye el prompt optimizado para extracción de datos de cédulas colombianas (MÉTODO LEGACY)
    */
   private buildPrompt(): string {
-    return `Eres un experto extractor de datos de documentos de identidad colombianos. Tu tarea es analizar la imagen de una cédula y extraer la siguiente información clave, basándote en los patrones de los diferentes tipos y versiones de cédulas que conoces.
+    return `Eres un experto extractor de datos de documentos de identidad colombianos con especialización en OCR de alta precisión. Analiza cuidadosamente la imagen de la cédula.
 
-Instrucciones Detalladas y Pistas de Búsqueda:
+ANÁLISIS INICIAL:
+1. Identifica si es "CÉDULA DE CIUDADANÍA" (CC) o "Cédula de Extranjería" (CE)
+2. Determina si es formato antiguo o nuevo (NUIP)
 
-Tipo de Documento:
-Busca el título principal: "CÉDULA DE CIUDADANÍA" (para colombianos) o "Cédula de Extranjería" (para residentes extranjeros). A veces el texto "REPÚBLICA DE COLOMBIA" es prominente. Si encuentras "CÉDULA DE CIUDADANÍA" o indicios de ciudadanía colombiana → tipo_documento: "CC". Si encuentras "Cédula de Extranjería" → tipo_documento: "CE".
+NÚMERO DE DOCUMENTO - OCR CRÍTICO:
 
-Número de Documento:
-Generalmente es un número grande y principal. Puede estar etiquetado como "NUIP", "Número No.", o simplemente ser el número más destacado cerca del tipo de cédula. Extrae solo los dígitos, sin puntos ni espacios.
+📍 UBICACIÓN ESPECÍFICA:
+- Cédulas NUEVAS: Buscar "NUIP" seguido del número (ej: NUIP 2.000.017.701)
+- Cédulas ANTIGUAS: Número grande arriba del nombre (ej: 1.020.742.434)
+- Extranjería: "No:" seguido del número (ej: No. 379929)
 
-Nombres y Apellidos:
-Busca las etiquetas "NOMBRES" y "APELLIDOS". Ten en cuenta que en algunos documentos (especialmente versiones antiguas o de extranjería) "APELLIDOS" puede ir antes de "NOMBRES". Separa primer y segundo nombre/apellido si están juntos en una sola línea.
+🔍 TÉCNICAS OCR PARA NÚMEROS:
+1. Longitud válida: 6-11 dígitos (ej: 51554033, 1020742434, 2000017701)
+2. Elimina puntos y espacios: 1.020.742.434 → 1020742434
+3. IGNORA números pequeños como altura (1.78), fechas, códigos
 
-Fecha de Nacimiento:
-Busca la etiqueta "Fecha de nacimiento". El formato puede variar (DD/MM/AAAA, AAAA/MM/DD, o día-MES-año). Convierte siempre al formato YYYY-MM-DD.
+⚠️ DÍGITOS PROBLEMÁTICOS - VERIFICA CUIDADOSAMENTE:
+- 4 vs 1: El 4 tiene líneas más gruesas y ángulos
+- 8 vs 6: El 8 tiene dos círculos cerrados completos
+- 0 vs O: Los números son más regulares y uniformes
+- 5 vs S: El 5 es más angular, la S es más curva
+- 2 vs Z: El 2 tiene base horizontal, la Z es más diagonal
 
-Fecha de Expedición:
-Busca la etiqueta "Fecha de expedición" o "Fecha y lugar de expedición". Puede estar cerca del lugar de expedición o la firma. Convierte siempre al formato YYYY-MM-DD.
+✅ VALIDACIÓN DEL NÚMERO:
+- Debe contener SOLO dígitos (0-9)
+- Longitud entre 6-11 caracteres
+- No puede empezar con 0
+- Si encuentras letras mezcladas, es incorrecto
+
+NOMBRES Y APELLIDOS:
+- Busca etiquetas: "APELLIDOS", "NOMBRES"
+- Formato típico: "APELLIDO1 APELLIDO2" en una línea, "NOMBRES" en otra
+- Extrae principalmente texto IMPRESO/TIPOGRAFIADO
+- Si no hay segundo nombre visible, déjalo como null
+- NO inventes nombres que no están claramente escritos
+
+FECHAS - BUSCA CUIDADOSAMENTE:
+- Fecha de nacimiento: Busca "Fecha de nacimiento" o similar
+- Fecha de expedición: Busca "Fecha de expedición", "Fecha y lugar de expedición", o fechas cerca de firmas/sellos
+- Formatos posibles: DD/MM/YYYY, DD-MM-YYYY, DD MMM YYYY, YYYY/MM/DD
+- Convierte TODO a formato: YYYY-MM-DD
+- Si encuentras múltiples fechas, usa contexto para identificar cuál es cuál
+
+MESES EN ESPAÑOL:
+ENE=01, FEB=02, MAR=03, ABR=04, MAY=05, JUN=06, 
+JUL=07, AGO=08, SEP=09, OCT=10, NOV=11, DIC=12
+
+PROCESO DE EXTRACCIÓN:
+1. Para el NÚMERO: Examina dígito por dígito, verifica coherencia
+2. Para NOMBRES: Solo texto impreso, ignora manuscritos
+3. Para FECHAS: Identifica formato y convierte correctamente
+4. Asigna confianza basada en claridad visual
 
 Formato de Salida:
-Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
+Responde ÚNICAMENTE con un JSON válido:
 {
   "tipo_documento": "CC|CE|desconocido",
   "numero_cedula": "string con solo números o null",
@@ -314,16 +388,20 @@ Responde ÚNICAMENTE con un JSON válido con esta estructura exacta:
   "fecha_expedicion_documento_confianza": 0-100
 }
 
-IMPORTANTE: Para cada campo, proporciona un nivel de confianza del 0-100:
-- 90-100: Completamente seguro del dato
-- 70-89: Muy probable que sea correcto
-- 50-69: Moderadamente seguro
-- 30-49: Poco seguro
-- 0-29: Muy incierto
+Niveles de confianza (0-100):
+- 90-100: Texto completamente claro y validado
+- 70-89: Muy probable, pequeñas dudas en 1-2 caracteres
+- 50-69: Moderadamente seguro, algunos caracteres ambiguos
+- 30-49: Poco seguro, varios caracteres dudosos
+- 0-29: Muy incierto, texto borroso o dañado
 
-Si un campo es null, su confianza debe ser 0.
+EJEMPLOS DE NÚMEROS VÁLIDOS:
+✅ 51554033 (8 dígitos)
+✅ 1020742434 (10 dígitos) 
+✅ 2000017701 (10 dígitos)
+✅ 379929 (6 dígitos - extranjería)
 
-Si un campo no se encuentra visible o es ilegible en el documento, usa null. Prioriza la información exacta sobre la exhaustividad. No agregues texto adicional fuera del JSON.`
+Si un campo es null, su confianza debe ser 0. No agregues texto adicional fuera del JSON.`
   }
 
   /**

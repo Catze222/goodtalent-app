@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Edit3, Archive, RotateCcw, Mail, Phone, User, Calendar, AlertTriangle } from 'lucide-react'
+import { Edit3, Archive, Mail, Phone, User, Calendar, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { formatDateColombiaLong } from '../../utils/dateUtils'
 
@@ -9,9 +9,12 @@ interface Company {
   id: string
   name: string
   tax_id: string
-  accounts_contact_name: string
-  accounts_contact_email: string
-  accounts_contact_phone: string
+  accounts_contact_name?: string
+  accounts_contact_email?: string
+  accounts_contact_phone?: string
+  comercial_contact_name?: string
+  comercial_contact_email?: string
+  comercial_contact_phone?: string
   status: boolean
   created_at: string
   updated_at: string
@@ -21,6 +24,13 @@ interface Company {
   archived_by?: string | null
   companies_created_by_handle?: string | null
   companies_updated_by_handle?: string | null
+  business_lines?: Array<{
+    id: string
+    nombre: string
+    descripcion?: string
+    es_activa?: boolean
+    estado?: string
+  }>
 }
 
 interface CompanyCardProps {
@@ -50,31 +60,6 @@ export default function CompanyCard({
   // Usar formateo de fecha correcto para Colombia (evita problema de zona horaria)
   const formatDate = formatDateColombiaLong
 
-  const handleStatusToggle = async () => {
-    if (!canUpdate) return
-    
-    setLoading('status')
-    try {
-      // Obtener usuario actual
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Usuario no autenticado')
-
-      const { error } = await supabase
-        .from('companies')
-        .update({ 
-          status: !company.status,
-          updated_by: user.id
-        })
-        .eq('id', company.id)
-
-      if (error) throw error
-      onUpdate()
-    } catch (error) {
-      console.error('Error updating status:', error)
-    } finally {
-      setLoading(null)
-    }
-  }
 
   const handleArchive = async () => {
     if (!canDelete) return
@@ -135,7 +120,7 @@ export default function CompanyCard({
 
   return (
     <>
-      <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300 relative overflow-hidden`}>
+      <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300 relative overflow-hidden flex flex-col h-full min-h-[520px]`}>
         
         {/* Status Badge */}
         <div className="absolute top-4 right-4">
@@ -164,31 +149,123 @@ export default function CompanyCard({
           <p className="mt-2 text-sm text-gray-500 pr-16">NIT: {company.tax_id}</p>
         </div>
 
-        {/* Contact Information */}
-        <div className="space-y-3 mb-6">
-          <div className="flex items-center space-x-3 text-base">
-            <User className="h-4 w-4 text-gray-400" />
-            <span className="text-gray-700 font-medium">{company.accounts_contact_name}</span>
-          </div>
+        {/* Contact Information - Siempre mostrar ambas secciones */}
+        <div className="space-y-4 mb-6">
           
-          <div className="flex items-center space-x-3 text-base">
-            <Mail className="h-4 w-4 text-gray-400" />
-            <a 
-              href={`mailto:${company.accounts_contact_email}`}
-              className="text-[#004C4C] hover:text-[#065C5C] transition-colors truncate"
-            >
-              {company.accounts_contact_email}
-            </a>
+          {/* Contacto Comercial - Siempre presente */}
+          <div>
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Contacto Comercial</h4>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3 text-sm">
+                <User className="h-4 w-4 text-gray-400" />
+                <span className="text-gray-700 font-medium">
+                  {company.comercial_contact_name || 'No disponible'}
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-3 text-sm">
+                <Mail className="h-4 w-4 text-gray-400" />
+                {company.comercial_contact_email ? (
+                  <a 
+                    href={`mailto:${company.comercial_contact_email}`}
+                    className="text-[#004C4C] hover:text-[#065C5C] transition-colors truncate"
+                  >
+                    {company.comercial_contact_email}
+                  </a>
+                ) : (
+                  <span className="text-gray-500">No disponible</span>
+                )}
+              </div>
+              
+              <div className="flex items-center space-x-3 text-sm">
+                <Phone className="h-4 w-4 text-gray-400" />
+                {company.comercial_contact_phone ? (
+                  <a 
+                    href={`tel:${company.comercial_contact_phone}`}
+                    className="text-[#004C4C] hover:text-[#065C5C] transition-colors"
+                  >
+                    {company.comercial_contact_phone}
+                  </a>
+                ) : (
+                  <span className="text-gray-500">No disponible</span>
+                )}
+              </div>
+            </div>
           </div>
-          
-          <div className="flex items-center space-x-3 text-base">
-            <Phone className="h-4 w-4 text-gray-400" />
-            <a 
-              href={`tel:${company.accounts_contact_phone}`}
-              className="text-[#004C4C] hover:text-[#065C5C] transition-colors"
-            >
-              {company.accounts_contact_phone}
-            </a>
+
+          {/* Contacto de Cartera - Siempre presente */}
+          <div className="pt-3 border-t border-gray-100">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Contacto de Cartera</h4>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3 text-sm">
+                <User className="h-4 w-4 text-gray-400" />
+                <span className="text-gray-700 font-medium">
+                  {company.accounts_contact_name || 'No disponible'}
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-3 text-sm">
+                <Mail className="h-4 w-4 text-gray-400" />
+                {company.accounts_contact_email ? (
+                  <a 
+                    href={`mailto:${company.accounts_contact_email}`}
+                    className="text-[#004C4C] hover:text-[#065C5C] transition-colors truncate"
+                  >
+                    {company.accounts_contact_email}
+                  </a>
+                ) : (
+                  <span className="text-gray-500">No disponible</span>
+                )}
+              </div>
+              
+              <div className="flex items-center space-x-3 text-sm">
+                <Phone className="h-4 w-4 text-gray-400" />
+                {company.accounts_contact_phone ? (
+                  <a 
+                    href={`tel:${company.accounts_contact_phone}`}
+                    className="text-[#004C4C] hover:text-[#065C5C] transition-colors"
+                  >
+                    {company.accounts_contact_phone}
+                  </a>
+                ) : (
+                  <span className="text-gray-500">No disponible</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Líneas de Negocio - Siempre presente */}
+        <div className="border-t border-gray-100 pt-4 mb-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+            <div className="w-3 h-3 bg-[#004C4C] rounded-sm mr-2"></div>
+            Líneas de Negocio
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {company.business_lines && company.business_lines.length > 0 ? (
+              company.business_lines.map((businessLine) => (
+                <span
+                  key={businessLine.id}
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                    businessLine.es_activa !== false
+                      ? 'bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white'
+                      : 'bg-gray-200 text-gray-600 line-through'
+                  }`}
+                  title={`${businessLine.descripcion || businessLine.nombre}${
+                    businessLine.es_activa === false ? ' (Descontinuada)' : ''
+                  }`}
+                >
+                  {businessLine.nombre}
+                  {businessLine.es_activa === false && (
+                    <span className="ml-1 text-xs opacity-75">❌</span>
+                  )}
+                </span>
+              ))
+            ) : (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                No disponible
+              </span>
+            )}
           </div>
         </div>
 
@@ -218,8 +295,11 @@ export default function CompanyCard({
           </div>
         </div>
 
+        {/* Spacer para empujar los botones hacia abajo */}
+        <div className="flex-grow"></div>
+
         {/* Actions */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 mt-4">
           {/* Editar */}
           {canUpdate && !isArchived && (
             <button
@@ -231,27 +311,7 @@ export default function CompanyCard({
             </button>
           )}
 
-          {/* Toggle Status */}
-          {canUpdate && !isArchived && (
-            <button
-              onClick={handleStatusToggle}
-              disabled={loading === 'status'}
-              className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors text-base ${
-                company.status
-                  ? 'bg-orange-50 text-orange-700 hover:bg-orange-100'
-                  : 'bg-green-50 text-green-700 hover:bg-green-100'
-              }`}
-            >
-              {loading === 'status' ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <RotateCcw className="h-4 w-4" />
-              )}
-              <span>{company.status ? 'Desactivar' : 'Activar'}</span>
-            </button>
-          )}
-
-          {/* Archivar */}
+          {/* Archivar - Acción principal que desactiva y archiva */}
           {canDelete && !isArchived && (
             <button
               onClick={() => setShowConfirm('archive')}
@@ -272,7 +332,7 @@ export default function CompanyCard({
               {loading === 'unarchive' ? (
                 <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <RotateCcw className="h-4 w-4" />
+                <Archive className="h-4 w-4" />
               )}
               <span>Restaurar</span>
             </button>
@@ -296,7 +356,7 @@ export default function CompanyCard({
             
             <p className="text-gray-700 mb-6">
               ¿Estás seguro de que deseas archivar la empresa <strong>{company.name}</strong>?
-              La empresa se marcará como archivada y se desactivará automáticamente.
+              Esta acción desactivará la empresa y la moverá al archivo histórico.
             </p>
             
             <div className="flex space-x-3">

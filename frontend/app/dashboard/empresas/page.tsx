@@ -12,9 +12,12 @@ interface Company {
   id: string
   name: string
   tax_id: string
-  accounts_contact_name: string
-  accounts_contact_email: string
-  accounts_contact_phone: string
+  accounts_contact_name?: string
+  accounts_contact_email?: string
+  accounts_contact_phone?: string
+  comercial_contact_name?: string
+  comercial_contact_email?: string
+  comercial_contact_phone?: string
   status: boolean
   created_at: string
   updated_at: string
@@ -23,6 +26,13 @@ interface Company {
   archived_at?: string | null
   companies_created_by_handle?: string | null
   companies_updated_by_handle?: string | null
+  business_lines?: Array<{
+    id: string
+    nombre: string
+    descripcion?: string
+    es_activa?: boolean
+    estado?: string
+  }>
 }
 
 type FilterStatus = 'all' | 'active' | 'inactive' | 'archived'
@@ -89,7 +99,20 @@ export default function EmpresasPage() {
       
       const { data, error } = await supabase
         .from('companies')
-        .select('*, companies_created_by_handle, companies_updated_by_handle')
+        .select(`
+          *, 
+          companies_created_by_handle, 
+          companies_updated_by_handle,
+          business_lines:empresa_lineas_negocio(
+            lineas_negocio(
+              id,
+              nombre,
+              descripcion,
+              es_activa
+            )
+          )
+        `)
+        .eq('empresa_lineas_negocio.es_activa', true)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -97,7 +120,14 @@ export default function EmpresasPage() {
         throw error
       }
 
-      const companiesData = data || []
+      const companiesData = (data || []).map(company => ({
+        ...company,
+        business_lines: company.business_lines?.map((bl: any) => ({
+          ...bl.lineas_negocio,
+          // Agregar indicador de estado para mostrar en UI
+          estado: bl.lineas_negocio?.es_activa ? 'Activa' : 'Descontinuada'
+        })) || []
+      }))
       
       // Guardar en cache
       localStorage.setItem('companies_cache', JSON.stringify({
@@ -134,8 +164,10 @@ export default function EmpresasPage() {
     const matchesSearch = searchTerm === '' || 
       company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       company.tax_id.includes(searchTerm) ||
-      company.accounts_contact_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.accounts_contact_email.toLowerCase().includes(searchTerm.toLowerCase())
+      (company.accounts_contact_name && company.accounts_contact_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (company.accounts_contact_email && company.accounts_contact_email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (company.comercial_contact_name && company.comercial_contact_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (company.comercial_contact_email && company.comercial_contact_email.toLowerCase().includes(searchTerm.toLowerCase()))
 
     // Filtro por estado
     const matchesFilter = 
@@ -288,7 +320,7 @@ export default function EmpresasPage() {
           <p className="text-gray-600">Cargando empresas...</p>
         </div>
       ) : filteredCompanies.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
           {filteredCompanies.map((company) => (
             <CompanyCard
               key={company.id}

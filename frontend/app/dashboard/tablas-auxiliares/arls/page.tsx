@@ -9,15 +9,16 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePermissions } from '@/lib/usePermissions'
 import { supabase } from '@/lib/supabaseClient'
-import { Shield, ArrowLeft } from 'lucide-react'
+import { Shield, ArrowLeft, Power, PowerOff } from 'lucide-react'
 import AuxiliaryDataTable from '@/components/ui/AuxiliaryDataTable'
 import AuxiliaryTableModal from '@/components/ui/AuxiliaryTableModal'
-import DeleteConfirmModal from '@/components/ui/DeleteConfirmModal'
+import ActivateDeactivateModal from '@/components/ui/ActivateDeactivateModal'
 import Toast from '@/components/dashboard/Toast'
 
 interface ARL {
   id: string
   nombre: string
+  es_activa: boolean
   created_at: string
   updated_at: string
 }
@@ -31,11 +32,11 @@ export default function ARLsPage() {
   // Modales
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showActivateDeactivateModal, setShowActivateDeactivateModal] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<ARL | null>(null)
   
   // Estados de carga específicos
-  const [deleting, setDeleting] = useState(false)
+  const [updating, setUpdating] = useState(false)
   
   // Toast
   const [toast, setToast] = useState<{
@@ -84,6 +85,7 @@ export default function ARLsPage() {
       const { data, error } = await supabase
         .from('arls')
         .select('*')
+        .order('es_activa', { ascending: false })
         .order('nombre', { ascending: true })
 
       if (error) {
@@ -182,33 +184,45 @@ export default function ARLsPage() {
     showToast('ARL actualizada exitosamente', 'success')
   }
 
-  // Eliminar ARL
-  const handleDelete = async () => {
+  // Activar/Desactivar ARL
+  const handleActivateDeactivate = async () => {
     if (!selectedRecord) return
 
-    setDeleting(true)
+    const { data: session } = await supabase.auth.getSession()
+    const userId = session.session?.user?.id
+
+    if (!userId) {
+      showToast('Usuario no autenticado', 'error')
+      return
+    }
+
+    setUpdating(true)
     try {
+      const newStatus = !selectedRecord.es_activa
       const { error } = await supabase
         .from('arls')
-        .delete()
+        .update({
+          es_activa: newStatus,
+          updated_by: userId
+        })
         .eq('id', selectedRecord.id)
 
       if (error) {
-        console.error('Error deleting arl:', error)
+        console.error('Error updating arl:', error)
         throw new Error(error.message)
       }
 
       // Clear cache and reload
       localStorage.removeItem('arls_cache')
       await loadData()
-      showToast('ARL eliminada exitosamente', 'success')
-      setShowDeleteModal(false)
+      showToast(`ARL ${newStatus ? 'activada' : 'desactivada'} exitosamente`, 'success')
+      setShowActivateDeactivateModal(false)
       setSelectedRecord(null)
     } catch (error: any) {
-      console.error('Error deleting arl:', error)
-      showToast(error.message || 'Error al eliminar la ARL', 'error')
+      console.error('Error updating arl:', error)
+      showToast(error.message || 'Error al actualizar la ARL', 'error')
     } finally {
-      setDeleting(false)
+      setUpdating(false)
     }
   }
 
@@ -218,6 +232,20 @@ export default function ARLsPage() {
       key: 'nombre',
       label: 'Nombre',
       sortable: true
+    },
+    {
+      key: 'es_activa',
+      label: 'Estado',
+      sortable: true,
+      render: (value: boolean) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          value 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-gray-100 text-gray-800'
+        }`}>
+          {value ? 'Activa' : 'Inactiva'}
+        </span>
+      )
     },
     {
       key: 'created_at',
@@ -284,7 +312,7 @@ export default function ARLsPage() {
         } : undefined}
         onDelete={canDelete ? (record) => {
           setSelectedRecord(record)
-          setShowDeleteModal(true)
+          setShowActivateDeactivateModal(true)
         } : undefined}
         canCreate={canCreate}
         canEdit={canEdit}
@@ -320,18 +348,18 @@ export default function ARLsPage() {
         onSubmit={handleEdit}
       />
 
-      {/* Modal Eliminar */}
-      <DeleteConfirmModal
-        isOpen={showDeleteModal}
+      {/* Modal Activar/Desactivar */}
+      <ActivateDeactivateModal
+        isOpen={showActivateDeactivateModal}
         onClose={() => {
-          setShowDeleteModal(false)
+          setShowActivateDeactivateModal(false)
           setSelectedRecord(null)
         }}
-        onConfirm={handleDelete}
-        title="Eliminar ARL"
-        message="¿Estás seguro de que deseas eliminar esta ARL?"
+        onConfirm={handleActivateDeactivate}
         recordName={selectedRecord?.nombre}
-        loading={deleting}
+        isActive={selectedRecord?.es_activa || false}
+        loading={updating}
+        entityType="ARL"
       />
 
       {/* Toast */}

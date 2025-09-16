@@ -9,15 +9,32 @@
 export const formatDateColombia = (dateString?: string | null): string => {
   if (!dateString) return '-'
   
-  // Crear fecha y agregar offset de Colombia para evitar problemas de zona horaria
-  const date = new Date(dateString + 'T00:00:00-05:00') // Colombia UTC-5
-  
-  return date.toLocaleDateString('es-CO', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    timeZone: 'America/Bogota'
-  })
+  try {
+    let date: Date
+    
+    // Si ya tiene timestamp (viene de la DB), usar directamente
+    if (dateString.includes('T') || dateString.includes(' ')) {
+      date = new Date(dateString)
+    } else {
+      // Si es solo fecha (YYYY-MM-DD), agregar offset de Colombia
+      date = new Date(dateString + 'T00:00:00-05:00')
+    }
+    
+    // Verificar que la fecha es válida
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida'
+    }
+    
+    return date.toLocaleDateString('es-CO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      timeZone: 'America/Bogota'
+    })
+  } catch (error) {
+    console.error('Error formateando fecha:', error, 'dateString:', dateString)
+    return 'Error en fecha'
+  }
 }
 
 /**
@@ -26,15 +43,32 @@ export const formatDateColombia = (dateString?: string | null): string => {
 export const formatDateColombiaLong = (dateString?: string | null): string => {
   if (!dateString) return '-'
   
-  // Crear fecha y agregar offset de Colombia para evitar problemas de zona horaria
-  const date = new Date(dateString + 'T00:00:00-05:00') // Colombia UTC-5
-  
-  return date.toLocaleDateString('es-CO', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'America/Bogota'
-  })
+  try {
+    let date: Date
+    
+    // Si ya tiene timestamp (viene de la DB), usar directamente
+    if (dateString.includes('T') || dateString.includes(' ')) {
+      date = new Date(dateString)
+    } else {
+      // Si es solo fecha (YYYY-MM-DD), agregar offset de Colombia
+      date = new Date(dateString + 'T00:00:00-05:00')
+    }
+    
+    // Verificar que la fecha es válida
+    if (isNaN(date.getTime())) {
+      return 'Fecha inválida'
+    }
+    
+    return date.toLocaleDateString('es-CO', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'America/Bogota'
+    })
+  } catch (error) {
+    console.error('Error formateando fecha:', error, 'dateString:', dateString)
+    return 'Error en fecha'
+  }
 }
 
 /**

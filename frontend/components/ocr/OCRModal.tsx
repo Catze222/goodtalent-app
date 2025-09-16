@@ -430,9 +430,7 @@ export default function OCRModal({ isOpen, onClose, onDataAccepted, disabled = f
                     <option value="">Seleccionar tipo...</option>
                     <option value="CC">Cédula de Ciudadanía</option>
                     <option value="CE">Cédula de Extranjería</option>
-                    <option value="Pasaporte">Pasaporte</option>
-                    <option value="PEP">PEP</option>
-                    <option value="Otro">Otro</option>
+                    <option value="PPT">PPT</option>
                   </select>
                 </div>
 

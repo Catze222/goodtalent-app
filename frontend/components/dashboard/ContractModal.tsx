@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, User, FileText, CheckSquare, ChevronRight, Shield, AlertTriangle } from 'lucide-react'
+import { X, User, FileText, CheckSquare, ChevronRight, Shield, AlertTriangle, Search } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { Contract, getContractStatusConfig, calculateTotalRemuneration, formatCurrency } from '../../types/contract'
 import OCRButton from '../ocr/OCRButton'
 import ContractModalOnboarding from './ContractModalOnboarding'
 import CompanySelector from '../ui/CompanySelector'
+import CitySelector from '../ui/CitySelector'
 
 
 
@@ -29,6 +30,7 @@ interface ContractModalProps {
  * Modal moderno de 3 pestañas para crear y editar contratos
  * Diseño responsive con stepper horizontal y validaciones en tiempo real
  */
+
 export default function ContractModal({
   isOpen,
   onClose,
@@ -39,6 +41,14 @@ export default function ContractModal({
 }: ContractModalProps) {
   const [currentTab, setCurrentTab] = useState(0)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  
+  // Estados para cálculos automáticos - valores por defecto mientras cargan
+  const [salarioMinimo, setSalarioMinimo] = useState<number>(1300000)
+  const [auxilioTransporteParametro, setAuxilioTransporteParametro] = useState<number>(162000)
+  
+  // Estados para asignaciones automáticas
+  const [cajaCompensacionActiva, setCajaCompensacionActiva] = useState<string>('')
+  const [arlActiva, setArlActiva] = useState<string>('')
   
   // Lógica de estados del contrato
   const statusConfig = contract ? getContractStatusConfig(contract) : null
@@ -107,6 +117,160 @@ export default function ContractModal({
 
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Cargar parámetros anuales para cálculos
+  const loadParametrosAnuales = async (year: number) => {
+    console.log('🔍 Cargando parámetros para año:', year)
+    try {
+      const { data: salarioData, error: salarioError } = await supabase
+        .from('parametros_anuales')
+        .select('valor_numerico')
+        .eq('tipo_parametro', 'salario_minimo')
+        .eq('año', year)
+        .eq('es_activo', true)
+        .single()
+
+      const { data: auxilioData, error: auxilioError } = await supabase
+        .from('parametros_anuales')
+        .select('valor_numerico')
+        .eq('tipo_parametro', 'auxilio_transporte')
+        .eq('año', year)
+        .eq('es_activo', true)
+        .single()
+
+      console.log('💰 Datos salario:', salarioData, salarioError)
+      console.log('🚌 Datos auxilio:', auxilioData, auxilioError)
+
+      const nuevoSalarioMinimo = salarioData?.valor_numerico || 1300000
+      const nuevoAuxilioTransporte = auxilioData?.valor_numerico || 162000
+
+      console.log('📊 Parámetros cargados:', { nuevoSalarioMinimo, nuevoAuxilioTransporte })
+
+      setSalarioMinimo(nuevoSalarioMinimo)
+      setAuxilioTransporteParametro(nuevoAuxilioTransporte)
+    } catch (error) {
+      console.error('Error loading parametros anuales:', error)
+      console.log('⚠️ Usando valores por defecto (tabla puede no existir aún)')
+      // Mantener valores por defecto que ya están inicializados
+    }
+  }
+
+  // Calcular auxilio de transporte automáticamente
+  const calculateAuxilioTransporte = (salario: number) => {
+    if (!salario || !salarioMinimo || !auxilioTransporteParametro) return 0
+    
+    const limite = salarioMinimo * 2
+    console.log('🧮 Calculando auxilio:', { salario, salarioMinimo, limite, auxilioTransporteParametro })
+    
+    if (salario <= limite) {
+      console.log('✅ Aplica auxilio:', auxilioTransporteParametro)
+      return auxilioTransporteParametro
+    }
+    console.log('❌ No aplica auxilio')
+    return 0
+  }
+
+  // Obtener caja de compensación activa para empresa/ciudad en fecha específica
+  const loadCajaCompensacionActiva = async (empresaId: string, ciudadId: string, fechaContrato: string) => {
+    if (!empresaId || !ciudadId || !fechaContrato) {
+      setCajaCompensacionActiva('')
+      return
+    }
+
+    console.log('🏢 Buscando caja activa:', { empresaId, ciudadId, fechaContrato })
+
+    try {
+      const { data, error } = await supabase
+        .from('empresa_cajas_compensacion')
+        .select(`
+          cajas_compensacion!inner(
+            nombre
+          )
+        `)
+        .eq('empresa_id', empresaId)
+        .eq('ciudad_id', ciudadId)
+        .eq('estado', 'activa')
+        .lte('fecha_inicio', fechaContrato)
+        .or(`fecha_fin.is.null,fecha_fin.gte.${fechaContrato}`)
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No se encontró ninguna caja activa (normal)
+          console.log('ℹ️ No hay caja de compensación activa para esta empresa/ciudad/fecha')
+          setCajaCompensacionActiva('')
+        } else {
+          console.error('Error loading caja activa:', error)
+          setCajaCompensacionActiva('')
+        }
+        return
+      }
+
+      const nombreCaja = data?.cajas_compensacion?.nombre || ''
+      console.log('✅ Caja encontrada:', nombreCaja)
+      setCajaCompensacionActiva(nombreCaja)
+
+    } catch (error: any) {
+      if (error.code === 'PGRST116') {
+        console.log('ℹ️ No hay caja de compensación activa para esta empresa/ciudad/fecha')
+        setCajaCompensacionActiva('')
+      } else {
+        console.error('Error loading caja activa:', error)
+        setCajaCompensacionActiva('')
+      }
+    }
+  }
+
+  // Obtener ARL activa para empresa en fecha específica
+  const loadArlActiva = async (empresaId: string, fechaContrato: string) => {
+    if (!empresaId || !fechaContrato) {
+      setArlActiva('')
+      return
+    }
+
+    console.log('🛡️ Buscando ARL activa:', { empresaId, fechaContrato })
+
+    try {
+      const { data, error } = await supabase
+        .from('empresa_arls')
+        .select(`
+          arls!inner(
+            nombre
+          )
+        `)
+        .eq('empresa_id', empresaId)
+        .eq('estado', 'activa')
+        .lte('fecha_inicio', fechaContrato)
+        .or(`fecha_fin.is.null,fecha_fin.gte.${fechaContrato}`)
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No se encontró ninguna ARL activa (normal)
+          console.log('ℹ️ No hay ARL activa para esta empresa/fecha')
+          setArlActiva('')
+        } else {
+          console.error('Error loading ARL activa:', error)
+          setArlActiva('')
+        }
+        return
+      }
+
+      const nombreArl = data?.arls?.nombre || ''
+      console.log('✅ ARL encontrada:', nombreArl)
+      setArlActiva(nombreArl)
+
+    } catch (error: any) {
+      if (error.code === 'PGRST116') {
+        console.log('ℹ️ No hay ARL activa para esta empresa/fecha')
+        setArlActiva('')
+      } else {
+        console.error('Error loading ARL activa:', error)
+        setArlActiva('')
+      }
+    }
+  }
+
   const [fieldConfidence, setFieldConfidence] = useState<Record<string, 'alto' | 'medio' | 'bajo'>>({})
 
   // Manejar datos extraídos por OCR
@@ -136,8 +300,93 @@ export default function ContractModal({
 
     // Mostrar mensaje de éxito con tipo de documento detectado
     const documentType = extractedFields.tipo_identificacion === 'CC' ? 'Cédula de Ciudadanía' : 
-                        extractedFields.tipo_identificacion === 'CE' ? 'Cédula de Extranjería' : 'documento'
+                        extractedFields.tipo_identificacion === 'CE' ? 'Cédula de Extranjería' :
+                        extractedFields.tipo_identificacion === 'PPT' ? 'PPT' : 'documento'
     console.log(`✅ ${documentType} procesada exitosamente con Gemini`)
+  }
+
+  // Buscar datos de contratos anteriores por cédula
+  const handleSearchCedula = async () => {
+    if (!formData.numero_identificacion.trim()) {
+      console.log('❌ No hay cédula para buscar')
+      return
+    }
+
+    setLoading(true)
+    console.log(`🔍 Buscando contratos con cédula: ${formData.numero_identificacion}`)
+
+    try {
+      const { data: contracts, error } = await supabase
+        .from('contracts')
+        .select(`
+          tipo_identificacion,
+          numero_identificacion,
+          fecha_expedicion_documento,
+          primer_nombre,
+          segundo_nombre,
+          primer_apellido,
+          segundo_apellido,
+          fecha_nacimiento,
+          celular,
+          email
+        `)
+        .eq('numero_identificacion', formData.numero_identificacion.trim())
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (error) {
+        console.error('❌ Error al buscar contratos:', error)
+        setErrors(prev => ({ ...prev, general: 'Error al buscar contratos anteriores' }))
+        return
+      }
+
+      if (!contracts || contracts.length === 0) {
+        console.log('📭 No se encontraron contratos con esta cédula')
+        setErrors(prev => ({ ...prev, general: 'No se encontraron contratos anteriores con esta cédula' }))
+        return
+      }
+
+      const contractData = contracts[0]
+      console.log('📋 Datos encontrados:', contractData)
+
+      // Precargar solo los campos de información personal
+      const personalData = {
+        tipo_identificacion: contractData.tipo_identificacion || formData.tipo_identificacion,
+        fecha_expedicion_documento: contractData.fecha_expedicion_documento || formData.fecha_expedicion_documento,
+        primer_nombre: contractData.primer_nombre || formData.primer_nombre,
+        segundo_nombre: contractData.segundo_nombre || formData.segundo_nombre,
+        primer_apellido: contractData.primer_apellido || formData.primer_apellido,
+        segundo_apellido: contractData.segundo_apellido || formData.segundo_apellido,
+        fecha_nacimiento: contractData.fecha_nacimiento || formData.fecha_nacimiento,
+        celular: contractData.celular || formData.celular,
+        email: contractData.email || formData.email
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        ...personalData
+      }))
+
+      // Limpiar errores de campos precargados
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        Object.keys(personalData).forEach(field => {
+          if (personalData[field as keyof typeof personalData]) {
+            delete newErrors[field]
+          }
+        })
+        delete newErrors.general
+        return newErrors
+      })
+
+      console.log('✅ Datos de información personal cargados exitosamente')
+      
+    } catch (error) {
+      console.error('❌ Error inesperado al buscar contratos:', error)
+      setErrors(prev => ({ ...prev, general: 'Error inesperado al buscar contratos' }))
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Helper para props de inputs con lógica de solo lectura
@@ -186,6 +435,24 @@ export default function ContractModal({
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = originalOverflow
+    }
+  }, [isOpen])
+
+  // Cargar parámetros del año actual al abrir el modal
+  useEffect(() => {
+    if (isOpen) {
+      const currentYear = new Date().getFullYear()
+      console.log('🚀 Modal abierto, cargando parámetros del año:', currentYear)
+      loadParametrosAnuales(currentYear)
+      
+      // Forzar recálculo inicial después de un pequeño delay
+      setTimeout(() => {
+        if (formData.salario > 0) {
+          const nuevoAuxilio = calculateAuxilioTransporte(formData.salario)
+          console.log('🔄 Recálculo inicial al abrir modal:', nuevoAuxilio)
+          setFormData(prev => ({ ...prev, auxilio_transporte: nuevoAuxilio }))
+        }
+      }, 100)
     }
   }, [isOpen])
 
@@ -341,7 +608,7 @@ export default function ContractModal({
       newErrors.empresa_final_id = 'Debe seleccionar una empresa cliente'
       errorsByTab[1].push('empresa_final_id')
     }
-    if (formData.tipo_contrato !== 'Indefinido' && !formData.fecha_fin) {
+    if (formData.tipo_contrato !== 'indefinido' && !formData.fecha_fin) {
       newErrors.fecha_fin = 'La fecha fin es obligatoria para contratos con duración definida'
       errorsByTab[1].push('fecha_fin')
     }
@@ -371,48 +638,87 @@ export default function ContractModal({
       errorsByTab[2].push('contrato_fecha_confirmacion')
     }
     
-    // ARL solicitada con datos → nombre y fecha obligatorios
-    if (formData.solicitud_inscripcion_arl && (
-      (typeof formData.arl_nombre === 'string' && formData.arl_nombre.trim()) || 
-      formData.arl_fecha_confirmacion
-    )) {
-      if (!(typeof formData.arl_nombre === 'string' && formData.arl_nombre.trim())) {
-        newErrors.arl_nombre = 'El nombre de la ARL es obligatorio cuando se proporciona información de confirmación'
-        errorsByTab[2].push('arl_nombre')
-      }
-      if (!formData.arl_fecha_confirmacion) {
-        newErrors.arl_fecha_confirmacion = 'La fecha de confirmación ARL es obligatoria cuando se proporciona información de confirmación'
+    // ARL solicitada con datos → si hay nombre debe haber fecha y viceversa
+    if (formData.solicitud_inscripcion_arl) {
+      const hasArlNombre = typeof formData.arl_nombre === 'string' && formData.arl_nombre.trim()
+      const hasArlFecha = !!formData.arl_fecha_confirmacion
+      
+      // 🚨 DEBUG ARL VALIDATION
+      console.log('🛡️ VALIDANDO ARL:', JSON.stringify({
+        solicitud_inscripcion_arl: formData.solicitud_inscripcion_arl,
+        arl_nombre: formData.arl_nombre,
+        arl_fecha_confirmacion: formData.arl_fecha_confirmacion,
+        arl_nombre_type: typeof formData.arl_nombre,
+        arl_nombre_trim: formData.arl_nombre?.trim?.(),
+        hasArlNombre: hasArlNombre,
+        hasArlFecha: hasArlFecha,
+        will_error_fecha: hasArlNombre && !hasArlFecha,
+        will_error_nombre: hasArlFecha && !hasArlNombre
+      }, null, 2))
+      
+      // Si tiene nombre pero no fecha
+      if (hasArlNombre && !hasArlFecha) {
+        newErrors.arl_fecha_confirmacion = 'La fecha de confirmación ARL es obligatoria cuando se especifica el nombre'
         errorsByTab[2].push('arl_fecha_confirmacion')
+        console.log('❌ ERROR ARL: Falta fecha cuando hay nombre')
+      }
+      
+      // Si tiene fecha pero no nombre
+      if (hasArlFecha && !hasArlNombre) {
+        newErrors.arl_nombre = 'El nombre de la ARL es obligatorio cuando se especifica la fecha'
+        errorsByTab[2].push('arl_nombre')
+        console.log('❌ ERROR ARL: Falta nombre cuando hay fecha')
       }
     }
     
-    // EPS solicitada con datos → radicado y fecha obligatorios
-    if (formData.solicitud_eps && (
-      (typeof formData.radicado_eps === 'string' && formData.radicado_eps.trim()) || 
-      formData.eps_fecha_confirmacion
-    )) {
-      if (!(typeof formData.radicado_eps === 'string' && formData.radicado_eps.trim())) {
-        newErrors.radicado_eps = 'El radicado EPS es obligatorio cuando se proporciona información de confirmación'
-        errorsByTab[2].push('radicado_eps')
-      }
-      if (!formData.eps_fecha_confirmacion) {
-        newErrors.eps_fecha_confirmacion = 'La fecha de confirmación EPS es obligatoria cuando se proporciona información de confirmación'
+    // EPS solicitada con datos → si hay radicado debe haber fecha y viceversa
+    if (formData.solicitud_eps) {
+      const hasEpsRadicado = typeof formData.radicado_eps === 'string' && formData.radicado_eps.trim()
+      const hasEpsFecha = !!formData.eps_fecha_confirmacion
+      
+      // Si tiene radicado pero no fecha
+      if (hasEpsRadicado && !hasEpsFecha) {
+        newErrors.eps_fecha_confirmacion = 'La fecha de confirmación EPS es obligatoria cuando se especifica el radicado'
         errorsByTab[2].push('eps_fecha_confirmacion')
       }
+      
+      // Si tiene fecha pero no radicado
+      if (hasEpsFecha && !hasEpsRadicado) {
+        newErrors.radicado_eps = 'El radicado EPS es obligatorio cuando se especifica la fecha'
+        errorsByTab[2].push('radicado_eps')
+      }
     }
     
-    // Caja enviada con datos → radicado y fecha obligatorios
-    if (formData.envio_inscripcion_caja && (
-      (typeof formData.radicado_ccf === 'string' && formData.radicado_ccf.trim()) || 
-      formData.caja_fecha_confirmacion
-    )) {
-      if (!(typeof formData.radicado_ccf === 'string' && formData.radicado_ccf.trim())) {
-        newErrors.radicado_ccf = 'El radicado CCF es obligatorio cuando se proporciona información de confirmación'
-        errorsByTab[2].push('radicado_ccf')
-      }
-      if (!formData.caja_fecha_confirmacion) {
-        newErrors.caja_fecha_confirmacion = 'La fecha de confirmación caja es obligatoria cuando se proporciona información de confirmación'
+    // Caja enviada con datos → si hay radicado debe haber fecha y viceversa
+    if (formData.envio_inscripcion_caja) {
+      const hasCajaRadicado = typeof formData.radicado_ccf === 'string' && formData.radicado_ccf.trim()
+      const hasCajaFecha = !!formData.caja_fecha_confirmacion
+      
+      // 🚨 DEBUG CAJA VALIDATION
+      console.log('🏢 VALIDANDO CAJA:', JSON.stringify({
+        envio_inscripcion_caja: formData.envio_inscripcion_caja,
+        radicado_ccf: formData.radicado_ccf,
+        caja_fecha_confirmacion: formData.caja_fecha_confirmacion,
+        radicado_ccf_type: typeof formData.radicado_ccf,
+        radicado_ccf_trim: formData.radicado_ccf?.trim?.(),
+        hasCajaRadicado: hasCajaRadicado,
+        hasCajaFecha: hasCajaFecha,
+        will_error_fecha: hasCajaRadicado && !hasCajaFecha,
+        will_error_radicado: hasCajaFecha && !hasCajaRadicado
+      }, null, 2))
+      
+      // Si tiene radicado pero no fecha
+      if (hasCajaRadicado && !hasCajaFecha) {
+        newErrors.caja_fecha_confirmacion = 'La fecha de confirmación caja es obligatoria cuando se especifica el radicado'
         errorsByTab[2].push('caja_fecha_confirmacion')
+        console.log('❌ ERROR CAJA: Falta fecha cuando hay radicado')
+      }
+      
+      // Si tiene fecha pero no radicado
+      if (hasCajaFecha && !hasCajaRadicado) {
+        newErrors.radicado_ccf = 'El radicado CCF es obligatorio cuando se especifica la fecha'
+        errorsByTab[2].push('radicado_ccf')
+        console.log('❌ ERROR CAJA: Falta radicado cuando hay fecha')
       }
     }
     
@@ -476,6 +782,62 @@ export default function ContractModal({
     return currentTabErrors.length === 0
   }
 
+  // Cargar parámetros cuando cambie la fecha de ingreso
+  useEffect(() => {
+    if (formData.fecha_ingreso) {
+      const year = new Date(formData.fecha_ingreso).getFullYear()
+      console.log('📅 Fecha de ingreso cambió:', formData.fecha_ingreso, 'Año:', year)
+      loadParametrosAnuales(year)
+    }
+  }, [formData.fecha_ingreso])
+
+  // Recalcular auxilio de transporte cuando cambie el salario o parámetros
+  useEffect(() => {
+    console.log('🔄 Efecto de recálculo:', { 
+      salario: formData.salario, 
+      salarioMinimo, 
+      auxilioTransporteParametro,
+      auxilioActual: formData.auxilio_transporte 
+    })
+    
+    if (formData.salario > 0 && salarioMinimo > 0 && auxilioTransporteParametro > 0) {
+      const nuevoAuxilio = calculateAuxilioTransporte(formData.salario)
+      console.log('🆕 Nuevo auxilio calculado:', nuevoAuxilio, 'vs actual:', formData.auxilio_transporte)
+      
+      if (nuevoAuxilio !== formData.auxilio_transporte) {
+        console.log('📝 Actualizando auxilio de transporte')
+        setFormData(prev => ({ ...prev, auxilio_transporte: nuevoAuxilio }))
+      }
+    }
+  }, [formData.salario, salarioMinimo, auxilioTransporteParametro])
+
+  // Cargar caja de compensación cuando cambien empresa, ciudad o fecha de ingreso
+  useEffect(() => {
+    if (formData.empresa_final_id && formData.ciudad_labora && formData.fecha_ingreso) {
+      console.log('🔄 Cargando caja para:', {
+        empresa: formData.empresa_final_id,
+        ciudad: formData.ciudad_labora,
+        fecha: formData.fecha_ingreso
+      })
+      loadCajaCompensacionActiva(formData.empresa_final_id, formData.ciudad_labora, formData.fecha_ingreso)
+    } else {
+      setCajaCompensacionActiva('')
+    }
+  }, [formData.empresa_final_id, formData.ciudad_labora, formData.fecha_ingreso])
+
+  // Cargar ARL cuando cambien empresa o fecha de ingreso
+  useEffect(() => {
+    if (formData.empresa_final_id && formData.fecha_ingreso) {
+      console.log('🔄 Cargando ARL para:', {
+        empresa: formData.empresa_final_id,
+        fecha: formData.fecha_ingreso
+      })
+      loadArlActiva(formData.empresa_final_id, formData.fecha_ingreso)
+    } else {
+      setArlActiva('')
+    }
+  }, [formData.empresa_final_id, formData.fecha_ingreso])
+
   // Manejar cambios en el formulario
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -487,7 +849,7 @@ export default function ContractModal({
 
     // Lógica especial para fecha_fin
     if (field === 'tipo_contrato') {
-      if (value === 'Indefinido') {
+      if (value === 'indefinido') {
         setFormData(prev => ({ ...prev, fecha_fin: '' }))
       }
     }
@@ -549,6 +911,38 @@ export default function ContractModal({
         
         console.log('🔍 ERRORES DETALLADOS:', detailedErrors)
         console.log('📋 ERRORES POR TAB:', errorsByTab)
+        
+        // 🚨 DEBUGGING PROFUNDO - JSON COMPLETO
+        console.log('🚨 DEBUG COMPLETO - ERRORES:', JSON.stringify({
+          errors: errors,
+          errorsByTab: errorsByTab,
+          detailedErrors: detailedErrors,
+          formDataARL: {
+            solicitud_inscripcion_arl: formData.solicitud_inscripcion_arl,
+            arl_nombre: formData.arl_nombre,
+            arl_fecha_confirmacion: formData.arl_fecha_confirmacion,
+            arl_nombre_type: typeof formData.arl_nombre,
+            arl_nombre_trim: formData.arl_nombre?.trim?.(),
+            arl_nombre_length: formData.arl_nombre?.length
+          },
+          formDataCaja: {
+            envio_inscripcion_caja: formData.envio_inscripcion_caja,
+            radicado_ccf: formData.radicado_ccf,
+            caja_fecha_confirmacion: formData.caja_fecha_confirmacion,
+            radicado_ccf_type: typeof formData.radicado_ccf,
+            radicado_ccf_trim: formData.radicado_ccf?.trim?.(),
+            radicado_ccf_length: formData.radicado_ccf?.length
+          },
+          formDataEPS: {
+            solicitud_eps: formData.solicitud_eps,
+            radicado_eps: formData.radicado_eps,
+            eps_fecha_confirmacion: formData.eps_fecha_confirmacion,
+            radicado_eps_type: typeof formData.radicado_eps,
+            radicado_eps_trim: formData.radicado_eps?.trim?.(),
+            radicado_eps_length: formData.radicado_eps?.length
+          },
+          timestamp: new Date().toISOString()
+        }, null, 2))
         
         setErrors({
           ...errors,
@@ -732,9 +1126,18 @@ export default function ContractModal({
             {/* Tab 1: Información Personal */}
             {currentTab === 0 && (
               <div className="space-y-3 lg:space-y-4">
-                {/* Botón OCR - Solo mostrar en modo creación */}
+                {/* Botones OCR y Buscar Cédula - Solo mostrar en modo creación */}
                 {mode === 'create' && (
-                  <div className="mb-4 flex justify-end">
+                  <div className="mb-4 flex justify-end gap-3">
+                    <button
+                      onClick={handleSearchCedula}
+                      disabled={isReadOnly || loading || !formData.numero_identificacion.trim()}
+                      className="inline-flex items-center px-4 py-2 bg-[#0A6A6A] text-[#E6F5F7] text-sm font-medium rounded-lg hover:bg-[#065C5C] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                      title={!formData.numero_identificacion.trim() ? "Ingrese una cédula primero" : "Buscar datos de contratos anteriores"}
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      Buscar Cédula
+                    </button>
                     <OCRButton
                       onDataExtracted={handleOCRDataExtracted}
                       disabled={isReadOnly}
@@ -756,9 +1159,7 @@ export default function ContractModal({
                       <option value="">Seleccionar tipo de documento...</option>
                       <option value="CC">Cédula de Ciudadanía</option>
                       <option value="CE">Cédula de Extranjería</option>
-                      <option value="Pasaporte">Pasaporte</option>
-                      <option value="PEP">PEP</option>
-                      <option value="Otro">Otro</option>
+                      <option value="PPT">PPT</option>
                     </select>
                   </div>
 
@@ -924,9 +1325,12 @@ export default function ContractModal({
                       {...getInputProps('empresa_interna')}
                     >
                       <option value="">Seleccionar empresa interna...</option>
-                      <option value="Good">Good</option>
-                      <option value="CPS">CPS</option>
+                      <option value="temporal">Temporal</option>
+                      <option value="outsourcing">Outsourcing</option>
                     </select>
+                    {errors.empresa_interna && (
+                      <p className="text-red-600 text-xs mt-1">{errors.empresa_interna}</p>
+                    )}
                   </div>
 
                   <div>
@@ -950,13 +1354,17 @@ export default function ContractModal({
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Ciudad donde Labora
                     </label>
-                    <input
-                      type="text"
-                      value={formData.ciudad_labora || ''}
-                      onChange={(e) => !isReadOnly && handleInputChange('ciudad_labora', e.target.value)}
-                      {...getInputProps('ciudad_labora')}
-                      placeholder="Ej: Bogotá"
+                    <CitySelector
+                      empresaId={formData.empresa_final_id}
+                      selectedCityId={formData.ciudad_labora || ''}
+                      onCitySelect={(cityId, cityName) => !isReadOnly && handleInputChange('ciudad_labora', cityId)}
+                      placeholder="Seleccionar ciudad donde labora..."
+                      disabled={isReadOnly || !formData.empresa_final_id}
+                      error={!!errors.ciudad_labora}
                     />
+                    {errors.ciudad_labora && (
+                      <p className="text-red-600 text-xs mt-1">{errors.ciudad_labora}</p>
+                    )}
                   </div>
 
                   <div>
@@ -973,6 +1381,28 @@ export default function ContractModal({
                   </div>
 
 
+
+                  {/* Tipo de Contrato - Fila completa */}
+                  <div className="col-span-1 lg:col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Tipo de Contrato
+                    </label>
+                    <select
+                      value={formData.tipo_contrato || ''}
+                      onChange={(e) => !isReadOnly && handleInputChange('tipo_contrato', e.target.value)}
+                      {...getInputProps('tipo_contrato')}
+                    >
+                      <option value="">Seleccionar tipo de contrato...</option>
+                      <option value="indefinido">Indefinido</option>
+                      <option value="fijo">Fijo</option>
+                      <option value="obra_o_labor">Obra o Labor</option>
+                      <option value="sena_universitario">SENA/Universitario</option>
+                      <option value="convenio_institucional">Convenio Institucional</option>
+                    </select>
+                    {errors.tipo_contrato && (
+                      <p className="text-red-600 text-xs mt-1">{errors.tipo_contrato}</p>
+                    )}
+                  </div>
 
                   {/* Campo SENA mejorado con tooltip */}
                   <div className="col-span-1 lg:col-span-2">
@@ -1011,24 +1441,6 @@ export default function ContractModal({
                     </div>
                   </div>
 
-                  {/* Tipo de Contrato - Fila completa */}
-                  <div className="col-span-1 lg:col-span-2">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Tipo de Contrato
-                    </label>
-                    <select
-                      value={formData.tipo_contrato || ''}
-                      onChange={(e) => !isReadOnly && handleInputChange('tipo_contrato', e.target.value)}
-                      {...getInputProps('tipo_contrato')}
-                    >
-                      <option value="">Seleccionar tipo de contrato...</option>
-                      <option value="Indefinido">Indefinido</option>
-                      <option value="Fijo">Fijo</option>
-                      <option value="Obra">Obra</option>
-                      <option value="Aprendizaje">Aprendizaje</option>
-                    </select>
-                  </div>
-
                   {/* Fechas - Una fila para las dos fechas */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -1046,23 +1458,23 @@ export default function ContractModal({
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Fecha de Terminación
-                      {formData.tipo_contrato === 'Indefinido' && (
+                      {formData.tipo_contrato === 'indefinido' && (
                         <span className="text-xs text-gray-500 ml-1">(No aplica)</span>
                       )}
                     </label>
                     <input
                       type="date"
-                      value={formData.tipo_contrato === 'Indefinido' ? '' : formData.fecha_fin || ''}
+                      value={formData.tipo_contrato === 'indefinido' ? '' : formData.fecha_fin || ''}
                       onChange={(e) => !isReadOnly && handleInputChange('fecha_fin', e.target.value)}
                       {...getInputProps('fecha_fin', !!errors.fecha_fin)}
-                      disabled={formData.tipo_contrato === 'Indefinido' || isReadOnly}
+                      disabled={formData.tipo_contrato === 'indefinido' || isReadOnly}
                       className={`${getInputProps('fecha_fin', !!errors.fecha_fin).className} ${
-                        formData.tipo_contrato === 'Indefinido' 
+                        formData.tipo_contrato === 'indefinido' 
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
                           : ''
                       }`}
                     />
-                    {errors.fecha_fin && formData.tipo_contrato !== 'Indefinido' && (
+                    {errors.fecha_fin && formData.tipo_contrato !== 'indefinido' && (
                       <p className="text-red-600 text-xs mt-1">{errors.fecha_fin}</p>
                     )}
                   </div>
@@ -1078,9 +1490,13 @@ export default function ContractModal({
                       {...getInputProps('tipo_salario')}
                     >
                       <option value="">Seleccionar tipo de salario...</option>
-                      <option value="Integral">Integral</option>
-                      <option value="Ordinario">Ordinario</option>
+                      <option value="indefinido">Indefinido</option>
+                      <option value="ordinario">Ordinario</option>
+                      <option value="tiempo_parcial">Tiempo parcial</option>
                     </select>
+                    {errors.tipo_salario && (
+                      <p className="text-red-600 text-xs mt-1">{errors.tipo_salario}</p>
+                    )}
                   </div>
 
                   {/* Layout fijo - Salario y Auxilio Transporte siempre juntos */}
@@ -1108,19 +1524,27 @@ export default function ContractModal({
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Auxilio de Transporte
+                      <span className="text-xs text-blue-600 ml-1">(Calculado automáticamente)</span>
                     </label>
-                    <input
-                      type="text"
-                      value={formData.auxilio_transporte ? formatNumberWithDots(formData.auxilio_transporte) : ''}
-                      onChange={(e) => {
-                        if (!isReadOnly) {
-                          const numericValue = parseNumberFromDots(e.target.value)
-                          handleInputChange('auxilio_transporte', numericValue)
-                        }
-                      }}
-                      {...getInputProps('auxilio_transporte')}
-                      placeholder="Ej: 140.606"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formData.auxilio_transporte ? formatNumberWithDots(formData.auxilio_transporte) : '0'}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                        placeholder="Se calcula según salario"
+                      />
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="group relative">
+                          <div className="w-4 h-4 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs cursor-help">
+                            ?
+                          </div>
+                          <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-48">
+                            Se asigna si el salario es ≤ 2 salarios mínimos
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Layout fijo - Auxilios siempre numero y concepto lado a lado */}
@@ -1372,6 +1796,8 @@ export default function ContractModal({
                   getInputProps={getInputProps}
                   getCheckboxProps={getCheckboxProps}
                   errors={errors}
+                  cajaCompensacionActiva={cajaCompensacionActiva}
+                  arlActiva={arlActiva}
                 />
 
                 {/* URL de Dropbox */}

@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Calendar, FileText } from 'lucide-react'
+import { X, Calendar, FileText, Info } from 'lucide-react'
 import { Contract } from '../../types/contract'
+import { supabase } from '../../lib/supabaseClient'
+import AutocompleteSelect from './AutocompleteSelect'
 
 interface OnboardingDetailModalProps {
   isOpen: boolean
@@ -21,6 +23,19 @@ interface OnboardingDetailModalProps {
   }
 }
 
+interface ModalConfig {
+  textLabel: string | null
+  textPlaceholder: string
+  textField: string
+  dateField: string
+  icon: JSX.Element
+  description: string
+  isAutomatic?: boolean
+  automaticValue?: string
+  isDropdown?: boolean
+  dropdownTable?: 'eps' | 'fondos_cesantias' | 'fondos_pension'
+}
+
 /**
  * Modal para capturar información adicional en procesos de onboarding
  * Permite ingresar texto descriptivo y fecha de confirmación
@@ -34,17 +49,116 @@ export default function OnboardingDetailModal({
   const [text, setText] = useState('')
   const [date, setDate] = useState('')
   const [loading, setLoading] = useState(false)
+  
+  // Estados para campos automáticos
+  const [arlActiva, setArlActiva] = useState('')
+  const [cajaActiva, setCajaActiva] = useState('')
+  const [loadingAutoFields, setLoadingAutoFields] = useState(false)
+
+  // Funciones para cargar campos automáticos
+  const loadArlActiva = async (empresaId: string, fechaContrato: string) => {
+    if (!empresaId || !fechaContrato) {
+      setArlActiva('')
+      return
+    }
+    
+    setLoadingAutoFields(true)
+    try {
+      const { data, error } = await supabase
+        .from('empresa_arls')
+        .select(`
+          arls!inner(
+            nombre
+          )
+        `)
+        .eq('empresa_id', empresaId)
+        .eq('estado', 'activa')
+        .lte('fecha_inicio', fechaContrato)
+        .or(`fecha_fin.is.null,fecha_fin.gte.${fechaContrato}`)
+        .single()
+
+      if (error) {
+        if (error.code !== 'PGRST116') {
+          console.error('Error loading ARL activa:', error)
+        }
+        setArlActiva('')
+        return
+      }
+
+      const nombreArl = data?.arls?.nombre || ''
+      setArlActiva(nombreArl)
+    } catch (error: any) {
+      if (error.code !== 'PGRST116') {
+        console.error('Error loading ARL activa:', error)
+      }
+      setArlActiva('')
+    } finally {
+      setLoadingAutoFields(false)
+    }
+  }
+
+  const loadCajaActiva = async (empresaId: string, ciudadId: string, fechaContrato: string) => {
+    if (!empresaId || !ciudadId || !fechaContrato) {
+      setCajaActiva('')
+      return
+    }
+    
+    setLoadingAutoFields(true)
+    try {
+      const { data, error } = await supabase
+        .from('empresa_cajas_compensacion')
+        .select(`
+          cajas_compensacion!inner(
+            nombre
+          )
+        `)
+        .eq('empresa_id', empresaId)
+        .eq('ciudad_id', ciudadId)
+        .eq('estado', 'activa')
+        .lte('fecha_inicio', fechaContrato)
+        .or(`fecha_fin.is.null,fecha_fin.gte.${fechaContrato}`)
+        .single()
+
+      if (error) {
+        if (error.code !== 'PGRST116') {
+          console.error('Error loading caja activa:', error)
+        }
+        setCajaActiva('')
+        return
+      }
+
+      const nombreCaja = data?.cajas_compensacion?.nombre || ''
+      setCajaActiva(nombreCaja)
+    } catch (error: any) {
+      if (error.code !== 'PGRST116') {
+        console.error('Error loading caja activa:', error)
+      }
+      setCajaActiva('')
+    } finally {
+      setLoadingAutoFields(false)
+    }
+  }
 
   // Resetear formulario cuando cambia el modal
   useEffect(() => {
     if (isOpen && data.contract) {
       setText('')
       setDate(new Date().toISOString().split('T')[0]) // Fecha actual por defecto
+      
+      // Cargar campos automáticos según el tipo
+      const fechaContrato = data.contract.fecha_ingreso
+      if (fechaContrato) {
+        if (data.type === 'arl' && data.contract.empresa_final_id) {
+          loadArlActiva(data.contract.empresa_final_id, fechaContrato)
+        } else if (data.type === 'caja' && data.contract.empresa_final_id && data.contract.ciudad_labora) {
+          loadCajaActiva(data.contract.empresa_final_id, data.contract.ciudad_labora, fechaContrato)
+        }
+      }
     }
-  }, [isOpen, data.contract])
+  }, [isOpen, data.contract, data.type])
 
   // Configuración según el tipo de modal
-  const getModalConfig = () => {
+  const getModalConfig = (): ModalConfig => {
     // Para campos que solo requieren fecha (examenes, contrato firmado)
     if (data.field === 'examenes') {
       return {
@@ -71,48 +185,58 @@ export default function OnboardingDetailModal({
     switch (data.type) {
       case 'arl':
         return {
-          textLabel: 'Nombre de la ARL',
-          textPlaceholder: 'Ej: Positiva, Sura, ARL SURA...',
+          textLabel: null, // Campo automático
+          textPlaceholder: '',
           textField: 'arl_nombre',
           dateField: 'arl',
           icon: <FileText className="h-5 w-5" />,
-          description: 'Ingresa el nombre de la ARL y la fecha de confirmación'
+          description: 'La ARL se asigna automáticamente según la configuración activa de la empresa en la fecha del contrato',
+          isAutomatic: true,
+          automaticValue: arlActiva
         }
       case 'eps':
         return {
-          textLabel: 'Radicado EPS',
-          textPlaceholder: 'Ej: RAD-EPS-2025-001',
+          textLabel: 'EPS',
+          textPlaceholder: '',
           textField: 'radicado_eps',
           dateField: 'eps',
           icon: <FileText className="h-5 w-5" />,
-          description: 'Ingresa el número de radicado EPS y la fecha de confirmación'
+          description: 'Selecciona la EPS de la lista y confirma la fecha',
+          isDropdown: true,
+          dropdownTable: 'eps' as const
         }
       case 'caja':
         return {
-          textLabel: 'Radicado CCF',
-          textPlaceholder: 'Ej: RAD-CCF-2025-001',
+          textLabel: null, // Campo automático
+          textPlaceholder: '',
           textField: 'radicado_ccf',
           dateField: 'caja',
           icon: <FileText className="h-5 w-5" />,
-          description: 'Ingresa el número de radicado CCF y la fecha de confirmación'
+          description: 'La Caja de Compensación se asigna automáticamente según la configuración activa de la empresa y ciudad en la fecha del contrato',
+          isAutomatic: true,
+          automaticValue: cajaActiva
         }
       case 'cesantias':
         return {
           textLabel: 'Fondo de Cesantías',
-          textPlaceholder: 'Ej: Protección, Porvenir, Colfondos...',
+          textPlaceholder: '',
           textField: 'fondo_cesantias',
           dateField: 'cesantias',
           icon: <FileText className="h-5 w-5" />,
-          description: 'Ingresa el nombre del fondo de cesantías y la fecha de confirmación'
+          description: 'Selecciona el fondo de cesantías de la lista y confirma la fecha',
+          isDropdown: true,
+          dropdownTable: 'fondos_cesantias' as const
         }
       case 'pension':
         return {
           textLabel: 'Fondo de Pensión',
-          textPlaceholder: 'Ej: Protección, Porvenir, Colfondos, Colpensiones...',
+          textPlaceholder: '',
           textField: 'fondo_pension',
           dateField: 'pension',
           icon: <FileText className="h-5 w-5" />,
-          description: 'Ingresa el nombre del fondo de pensión y la fecha de confirmación'
+          description: 'Selecciona el fondo de pensión de la lista y confirma la fecha',
+          isDropdown: true,
+          dropdownTable: 'fondos_pension' as const
         }
       default:
         return {
@@ -129,12 +253,22 @@ export default function OnboardingDetailModal({
   const config = getModalConfig()
 
   const handleSave = async () => {
-    // Si el campo requiere texto y no está presente, no permitir guardar
-    if (config.textLabel && !text.trim()) {
+    // Para campos automáticos, usar el valor automático
+    const finalText = config.isAutomatic 
+      ? config.automaticValue 
+      : config.textLabel 
+        ? text.trim() 
+        : undefined
+
+    // Validaciones
+    if (config.textLabel && !finalText) {
       return
     }
 
-    // Si no hay fecha, no permitir guardar
+    if (config.isAutomatic && !config.automaticValue) {
+      return // No se puede guardar sin valor automático
+    }
+
     if (!date) {
       return
     }
@@ -142,7 +276,7 @@ export default function OnboardingDetailModal({
     setLoading(true)
     try {
       await onSave({
-        text: config.textLabel ? text.trim() : undefined,
+        text: finalText,
         date,
         textField: config.textField,
         dateField: config.dateField
@@ -158,7 +292,7 @@ export default function OnboardingDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[95vh] overflow-hidden">
         
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-[#004C4C] to-[#065C5C]">
@@ -189,8 +323,49 @@ export default function OnboardingDetailModal({
             {config.description}
           </p>
 
-          {/* Campo de texto - solo si es requerido */}
-          {config.textLabel && (
+          {/* Campo automático (ARL/Caja) */}
+          {config.isAutomatic && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {data.type === 'arl' ? 'ARL Asignada' : 'Caja de Compensación Asignada'} *
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={loadingAutoFields ? 'Cargando...' : config.automaticValue || 'No disponible'}
+                  readOnly
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-700"
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <Info className="h-4 w-4 text-gray-400" />
+                </div>
+              </div>
+              {!config.automaticValue && !loadingAutoFields && (
+                <p className="text-amber-600 text-xs mt-1 flex items-center">
+                  <Info className="h-3 w-3 mr-1" />
+                  No se encontró configuración activa para la fecha del contrato
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Autocomplete (EPS/Cesantías/Pensión) */}
+          {config.isDropdown && config.dropdownTable && (
+            <div>
+              <AutocompleteSelect
+                tableName={config.dropdownTable}
+                selectedValue={text}
+                onSelect={(value) => setText(value)}
+                placeholder={`Escribir o buscar ${config.textLabel?.toLowerCase()}...`}
+                disabled={loading}
+                label={`${config.textLabel} *`}
+                error={!text.trim() && config.textLabel !== null}
+              />
+            </div>
+          )}
+
+          {/* Campo de texto tradicional (para casos especiales) */}
+          {config.textLabel && !config.isDropdown && !config.isAutomatic && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {config.textLabel} *
@@ -234,7 +409,12 @@ export default function OnboardingDetailModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={loading || (config.textLabel && !text.trim()) || !date}
+            disabled={
+              loading || 
+              (config.isAutomatic && !config.automaticValue) ||
+              (config.textLabel && !config.isAutomatic && !text.trim()) || 
+              !date
+            }
             className="px-6 py-2 bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white font-medium rounded-lg hover:from-[#065C5C] hover:to-[#0A6A6A] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Guardando...' : 'Confirmar'}

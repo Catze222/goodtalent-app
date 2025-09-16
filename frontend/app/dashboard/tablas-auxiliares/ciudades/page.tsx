@@ -9,15 +9,16 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePermissions } from '@/lib/usePermissions'
 import { supabase } from '@/lib/supabaseClient'
-import { MapPin, ArrowLeft, Edit, Trash2 } from 'lucide-react'
+import { MapPin, ArrowLeft, Edit, Power, PowerOff } from 'lucide-react'
 import ResponsiveDataTable from '@/components/ui/ResponsiveDataTable'
 import AuxiliaryTableModal from '@/components/ui/AuxiliaryTableModal'
-import DeleteConfirmModal from '@/components/ui/DeleteConfirmModal'
+import ActivateDeactivateModal from '@/components/ui/ActivateDeactivateModal'
 import Toast from '@/components/dashboard/Toast'
 
 interface Ciudad {
   id: string
   nombre: string
+  es_activa: boolean
   created_at: string
   updated_at: string
 }
@@ -31,12 +32,12 @@ export default function CiudadesPage() {
   // Modales
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showActivateDeactivateModal, setShowActivateDeactivateModal] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<Ciudad | null>(null)
   
   // Estados de carga específicos
   const [submitting, setSubmitting] = useState(false)
-  const [deleting, setDeleting] = useState(false)
+  const [updating, setUpdating] = useState(false)
   
   // Toast
   const [toast, setToast] = useState<{
@@ -85,6 +86,7 @@ export default function CiudadesPage() {
       const { data, error } = await supabase
         .from('ciudades')
         .select('*')
+        .order('es_activa', { ascending: false })
         .order('nombre', { ascending: true })
 
       if (error) {
@@ -183,33 +185,45 @@ export default function CiudadesPage() {
     showToast('Ciudad actualizada exitosamente', 'success')
   }
 
-  // Eliminar ciudad
-  const handleDelete = async () => {
+  // Activar/Desactivar ciudad
+  const handleActivateDeactivate = async () => {
     if (!selectedRecord) return
 
-    setDeleting(true)
+    const { data: session } = await supabase.auth.getSession()
+    const userId = session.session?.user?.id
+
+    if (!userId) {
+      showToast('Usuario no autenticado', 'error')
+      return
+    }
+
+    setUpdating(true)
     try {
+      const newStatus = !selectedRecord.es_activa
       const { error } = await supabase
         .from('ciudades')
-        .delete()
+        .update({
+          es_activa: newStatus,
+          updated_by: userId
+        })
         .eq('id', selectedRecord.id)
 
       if (error) {
-        console.error('Error deleting ciudad:', error)
+        console.error('Error updating ciudad:', error)
         throw new Error(error.message)
       }
 
       // Clear cache and reload
       localStorage.removeItem('ciudades_cache')
       await loadData()
-      showToast('Ciudad eliminada exitosamente', 'success')
-      setShowDeleteModal(false)
+      showToast(`Ciudad ${newStatus ? 'activada' : 'desactivada'} exitosamente`, 'success')
+      setShowActivateDeactivateModal(false)
       setSelectedRecord(null)
     } catch (error: any) {
-      console.error('Error deleting ciudad:', error)
-      showToast(error.message || 'Error al eliminar la ciudad', 'error')
+      console.error('Error updating ciudad:', error)
+      showToast(error.message || 'Error al actualizar la ciudad', 'error')
     } finally {
-      setDeleting(false)
+      setUpdating(false)
     }
   }
 
@@ -222,10 +236,25 @@ export default function CiudadesPage() {
       mobileShow: true
     },
     {
+      key: 'es_activa',
+      label: 'Estado',
+      sortable: true,
+      mobileShow: true,
+      render: (value: boolean) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          value 
+            ? 'bg-green-100 text-green-800' 
+            : 'bg-gray-100 text-gray-800'
+        }`}>
+          {value ? 'Activa' : 'Inactiva'}
+        </span>
+      )
+    },
+    {
       key: 'created_at',
       label: 'Fecha Creación',
       sortable: true,
-      mobileShow: true,
+      mobileShow: false,
       render: (value: string) => new Date(value).toLocaleDateString('es-ES')
     }
   ]
@@ -244,15 +273,26 @@ export default function CiudadesPage() {
       show: () => canEdit
     },
     {
-      key: 'delete',
-      label: 'Eliminar',
-      icon: Trash2,
-      color: 'red' as const,
+      key: 'deactivate',
+      label: 'Desactivar',
+      icon: PowerOff,
+      color: 'orange' as const,
       onClick: (record: Ciudad) => {
         setSelectedRecord(record)
-        setShowDeleteModal(true)
+        setShowActivateDeactivateModal(true)
       },
-      show: () => canDelete
+      show: (record: Ciudad) => canDelete && record.es_activa
+    },
+    {
+      key: 'activate',
+      label: 'Activar',
+      icon: Power,
+      color: 'green' as const,
+      onClick: (record: Ciudad) => {
+        setSelectedRecord(record)
+        setShowActivateDeactivateModal(true)
+      },
+      show: (record: Ciudad) => canDelete && !record.es_activa
     }
   ]
 
@@ -348,18 +388,18 @@ export default function CiudadesPage() {
         onSubmit={handleEdit}
       />
 
-      {/* Modal Eliminar */}
-      <DeleteConfirmModal
-        isOpen={showDeleteModal}
+      {/* Modal Activar/Desactivar */}
+      <ActivateDeactivateModal
+        isOpen={showActivateDeactivateModal}
         onClose={() => {
-          setShowDeleteModal(false)
+          setShowActivateDeactivateModal(false)
           setSelectedRecord(null)
         }}
-        onConfirm={handleDelete}
-        title="Eliminar Ciudad"
-        message="¿Estás seguro de que deseas eliminar esta ciudad?"
+        onConfirm={handleActivateDeactivate}
         recordName={selectedRecord?.nombre}
-        loading={deleting}
+        isActive={selectedRecord?.es_activa || false}
+        loading={updating}
+        entityType="ciudad"
       />
 
       {/* Toast */}

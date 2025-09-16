@@ -1,6 +1,7 @@
 'use client'
 
 import { Contract } from '../../types/contract'
+import AuxiliaryDropdown from '../ui/AuxiliaryDropdown'
 
 interface ContractModalOnboardingProps {
   formData: Contract
@@ -9,6 +10,8 @@ interface ContractModalOnboardingProps {
   getInputProps: (field: string) => any
   getCheckboxProps: () => any
   errors: Record<string, string>
+  cajaCompensacionActiva?: string
+  arlActiva?: string
 }
 
 /**
@@ -21,7 +24,9 @@ export default function ContractModalOnboarding({
   handleInputChange,
   getInputProps,
   getCheckboxProps,
-  errors
+  errors,
+  cajaCompensacionActiva = '',
+  arlActiva = ''
 }: ContractModalOnboardingProps) {
   
   return (
@@ -203,7 +208,7 @@ export default function ContractModalOnboarding({
                 if (!isReadOnly && formData.solicitud_inscripcion_arl) {
                   if (e.target.checked) {
                     // Si se marca, inicializar campos con valores por defecto para que aparezcan
-                    if (!formData.arl_nombre) handleInputChange('arl_nombre', ' ') // Espacio para activar
+                    if (!formData.arl_nombre) handleInputChange('arl_nombre', arlActiva || 'ARL pendiente') // Usar valor real
                     if (!formData.arl_fecha_confirmacion) handleInputChange('arl_fecha_confirmacion', new Date().toISOString().split('T')[0])
                   } else {
                     // Si se desmarca, limpiar datos
@@ -236,20 +241,28 @@ export default function ContractModalOnboarding({
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre de la ARL *
+                  ARL Asignada
+                  <span className="text-xs text-blue-600 ml-1">(Calculada automáticamente)</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.arl_nombre || ''}
-                  onChange={(e) => !isReadOnly && handleInputChange('arl_nombre', e.target.value)}
-                  placeholder="Ej: Positiva, Sura..."
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] ${
-                    errors.arl_nombre ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
-                />
-                {errors.arl_nombre && (
-                  <p className="text-red-600 text-xs mt-1">{errors.arl_nombre}</p>
-                )}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={arlActiva || 'No asignada'}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                    placeholder="Se asigna según empresa y fecha"
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="group relative">
+                      <div className="w-4 h-4 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs cursor-help">
+                        ?
+                      </div>
+                      <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-48">
+                        Se asigna según la empresa y fecha del contrato
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -300,7 +313,7 @@ export default function ContractModalOnboarding({
                 if (!isReadOnly && formData.solicitud_eps) {
                   if (e.target.checked) {
                     // Si se marca, inicializar campos con valores por defecto para que aparezcan
-                    if (!formData.radicado_eps) handleInputChange('radicado_eps', ' ') // Espacio para activar
+                    if (!formData.radicado_eps) handleInputChange('radicado_eps', '') // Usuario debe seleccionar EPS
                     if (!formData.eps_fecha_confirmacion) handleInputChange('eps_fecha_confirmacion', new Date().toISOString().split('T')[0])
                   } else {
                     // Si se desmarca, limpiar datos
@@ -332,17 +345,15 @@ export default function ContractModalOnboarding({
           )) && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Radicado EPS *
-                </label>
-                <input
-                  type="text"
-                  value={formData.radicado_eps || ''}
-                  onChange={(e) => !isReadOnly && handleInputChange('radicado_eps', e.target.value)}
-                  placeholder="Ej: RAD-EPS-2025-001"
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] ${
-                    errors.radicado_eps ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
+                <AuxiliaryDropdown
+                  tableName="eps"
+                  selectedValue={formData.radicado_eps || ''}
+                  onSelect={(value) => !isReadOnly && handleInputChange('radicado_eps', value)}
+                  placeholder="Seleccionar EPS..."
+                  disabled={isReadOnly}
+                  error={!!errors.radicado_eps}
+                  label="EPS *"
+                  maxHeight="large"
                 />
                 {errors.radicado_eps && (
                   <p className="text-red-600 text-xs mt-1">{errors.radicado_eps}</p>
@@ -397,7 +408,7 @@ export default function ContractModalOnboarding({
                 if (!isReadOnly && formData.envio_inscripcion_caja) {
                   if (e.target.checked) {
                     // Si se marca, inicializar campos con valores por defecto para que aparezcan
-                    if (!formData.radicado_ccf) handleInputChange('radicado_ccf', ' ') // Espacio para activar
+                    if (!formData.radicado_ccf) handleInputChange('radicado_ccf', `RAD-${cajaCompensacionActiva || 'CAJA'}-${new Date().getFullYear()}`) // Usar valor real
                     if (!formData.caja_fecha_confirmacion) handleInputChange('caja_fecha_confirmacion', new Date().toISOString().split('T')[0])
                   } else {
                     // Si se desmarca, limpiar datos
@@ -430,20 +441,28 @@ export default function ContractModalOnboarding({
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Radicado CCF *
+                  Caja de Compensación Asignada
+                  <span className="text-xs text-blue-600 ml-1">(Calculada automáticamente)</span>
                 </label>
-                <input
-                  type="text"
-                  value={formData.radicado_ccf || ''}
-                  onChange={(e) => !isReadOnly && handleInputChange('radicado_ccf', e.target.value)}
-                  placeholder="Ej: RAD-CCF-2025-001"
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] ${
-                    errors.radicado_ccf ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
-                />
-                {errors.radicado_ccf && (
-                  <p className="text-red-600 text-xs mt-1">{errors.radicado_ccf}</p>
-                )}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={cajaCompensacionActiva || 'No asignada'}
+                    readOnly
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                    placeholder="Se asigna según ciudad y empresa"
+                  />
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="group relative">
+                      <div className="w-4 h-4 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs cursor-help">
+                        ?
+                      </div>
+                      <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-48">
+                        Se asigna según la ciudad donde labora y la empresa
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -526,17 +545,15 @@ export default function ContractModalOnboarding({
           )) && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Fondo de Cesantías *
-                </label>
-                <input
-                  type="text"
-                  value={formData.fondo_cesantias || ''}
-                  onChange={(e) => !isReadOnly && handleInputChange('fondo_cesantias', e.target.value)}
-                  placeholder="Ej: Protección, Porvenir..."
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] ${
-                    errors.fondo_cesantias ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
+                <AuxiliaryDropdown
+                  tableName="fondos_cesantias"
+                  selectedValue={formData.fondo_cesantias || ''}
+                  onSelect={(value) => !isReadOnly && handleInputChange('fondo_cesantias', value)}
+                  placeholder="Seleccionar fondo de cesantías..."
+                  disabled={isReadOnly}
+                  error={!!errors.fondo_cesantias}
+                  label="Fondo de Cesantías *"
+                  maxHeight="large"
                 />
                 {errors.fondo_cesantias && (
                   <p className="text-red-600 text-xs mt-1">{errors.fondo_cesantias}</p>
@@ -623,17 +640,15 @@ export default function ContractModalOnboarding({
           )) && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Fondo de Pensión *
-                </label>
-                <input
-                  type="text"
-                  value={formData.fondo_pension || ''}
-                  onChange={(e) => !isReadOnly && handleInputChange('fondo_pension', e.target.value)}
-                  placeholder="Ej: Protección, Porvenir, Colpensiones..."
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] ${
-                    errors.fondo_pension ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
+                <AuxiliaryDropdown
+                  tableName="fondos_pension"
+                  selectedValue={formData.fondo_pension || ''}
+                  onSelect={(value) => !isReadOnly && handleInputChange('fondo_pension', value)}
+                  placeholder="Seleccionar fondo de pensión..."
+                  disabled={isReadOnly}
+                  error={!!errors.fondo_pension}
+                  label="Fondo de Pensión *"
+                  maxHeight="large"
                 />
                 {errors.fondo_pension && (
                   <p className="text-red-600 text-xs mt-1">{errors.fondo_pension}</p>

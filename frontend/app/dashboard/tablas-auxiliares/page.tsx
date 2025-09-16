@@ -16,8 +16,10 @@ import {
   PiggyBank,
   Landmark,
   Cross,
+  Target,
   ArrowRight,
-  Database
+  Database,
+  Calculator
 } from 'lucide-react'
 
 interface TableMetrics {
@@ -27,6 +29,8 @@ interface TableMetrics {
   fondos_cesantias: number
   fondos_pension: number
   eps: number
+  lineas_negocio: number
+  parametros_anuales: number
 }
 
 interface AuxiliaryTable {
@@ -46,7 +50,9 @@ export default function TablesAuxiliariesPage() {
     arls: 0,
     fondos_cesantias: 0,
     fondos_pension: 0,
-    eps: 0
+    eps: 0,
+    lineas_negocio: 0,
+    parametros_anuales: 0
   })
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -76,14 +82,18 @@ export default function TablesAuxiliariesPage() {
             arlsResult,
             cesantiasResult,
             pensionResult,
-            epsResult
+            epsResult,
+            lineasNegocioResult,
+            parametrosResult
           ] = await Promise.all([
             supabase.from('ciudades').select('*', { count: 'exact', head: true }),
             supabase.from('cajas_compensacion').select('*', { count: 'exact', head: true }),
             supabase.from('arls').select('*', { count: 'exact', head: true }),
             supabase.from('fondos_cesantias').select('*', { count: 'exact', head: true }),
             supabase.from('fondos_pension').select('*', { count: 'exact', head: true }),
-            supabase.from('eps').select('*', { count: 'exact', head: true })
+            supabase.from('eps').select('*', { count: 'exact', head: true }),
+            supabase.from('lineas_negocio').select('*', { count: 'exact', head: true }),
+            supabase.from('parametros_anuales').select('*', { count: 'exact', head: true })
           ])
 
           setMetrics({
@@ -92,7 +102,9 @@ export default function TablesAuxiliariesPage() {
             arls: arlsResult.count || 0,
             fondos_cesantias: cesantiasResult.count || 0,
             fondos_pension: pensionResult.count || 0,
-            eps: epsResult.count || 0
+            eps: epsResult.count || 0,
+            lineas_negocio: lineasNegocioResult.count || 0,
+            parametros_anuales: parametrosResult.count || 0
           })
         } catch (error) {
           console.error('Error fetching metrics:', error)
@@ -159,6 +171,24 @@ export default function TablesAuxiliariesPage() {
       route: '/dashboard/tablas-auxiliares/eps',
       color: 'from-pink-500 to-pink-600',
       count: metrics.eps
+    },
+    {
+      id: 'lineas-negocio',
+      name: 'Líneas de Negocio',
+      description: 'Gestión de líneas de negocio y responsables',
+      icon: Target,
+      route: '/dashboard/tablas-auxiliares/lineas-negocio',
+      color: 'from-teal-500 to-teal-600',
+      count: metrics.lineas_negocio
+    },
+    {
+      id: 'parametros-anuales',
+      name: 'Parámetros Anuales',
+      description: 'Parámetros que cambian año a año (salarios, aportes, etc.)',
+      icon: Calculator,
+      route: '/dashboard/tablas-auxiliares/parametros-anuales',
+      color: 'from-indigo-500 to-indigo-600',
+      count: metrics.parametros_anuales
     }
   ]
 

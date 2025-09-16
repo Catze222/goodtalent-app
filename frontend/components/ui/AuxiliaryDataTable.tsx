@@ -10,7 +10,7 @@ import {
   Search, 
   Plus, 
   Edit, 
-  Trash2, 
+  Power, 
   X, 
   RotateCcw,
   ArrowUpDown,
@@ -265,11 +265,11 @@ export default function AuxiliaryDataTable({
                         {canDelete && onDelete && (
                           <button
                             onClick={() => onDelete(record)}
-                            className="flex items-center space-x-1 px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-all text-xs font-medium border border-red-200 group-hover:scale-105"
-                            title="Eliminar registro"
+                            className="flex items-center space-x-1 px-3 py-2 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg transition-all text-xs font-medium border border-orange-200 group-hover:scale-105"
+                            title="Activar/Desactivar registro"
                           >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Eliminar</span>
+                            <Power className="w-3 h-3" />
+                            <span>Estado</span>
                           </button>
                         )}
                       </div>
@@ -338,10 +338,10 @@ export default function AuxiliaryDataTable({
                             {canDelete && onDelete && (
                               <button
                                 onClick={() => onDelete(record)}
-                                className="inline-flex items-center p-2 text-red-600 hover:bg-red-100 rounded-lg transition-all hover:scale-110"
-                                title="Eliminar registro"
+                                className="inline-flex items-center p-2 text-orange-600 hover:bg-orange-100 rounded-lg transition-all hover:scale-110"
+                                title="Activar/Desactivar registro"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Power className="w-4 h-4" />
                               </button>
                             )}
                           </div>
