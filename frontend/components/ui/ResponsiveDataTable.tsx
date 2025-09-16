@@ -32,7 +32,7 @@ interface Action {
   key: string
   label: string
   icon: any
-  color: 'blue' | 'red' | 'green' | 'yellow' | 'purple'
+  color: 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'orange'
   onClick: (record: any) => void
   show?: (record: any) => boolean
 }
@@ -58,7 +58,8 @@ const actionColors = {
   red: 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200',
   green: 'bg-green-50 text-green-600 hover:bg-green-100 border-green-200',
   yellow: 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100 border-yellow-200',
-  purple: 'bg-purple-50 text-purple-600 hover:bg-purple-100 border-purple-200'
+  purple: 'bg-purple-50 text-purple-600 hover:bg-purple-100 border-purple-200',
+  orange: 'bg-orange-50 text-orange-600 hover:bg-orange-100 border-orange-200'
 }
 
 export default function ResponsiveDataTable({
