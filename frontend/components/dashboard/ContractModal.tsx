@@ -206,7 +206,7 @@ export default function ContractModal({
         return
       }
 
-      const nombreCaja = data?.cajas_compensacion?.nombre || ''
+      const nombreCaja = (data?.cajas_compensacion as any)?.nombre || ''
       console.log('✅ Caja encontrada:', nombreCaja)
       setCajaCompensacionActiva(nombreCaja)
 
@@ -256,7 +256,7 @@ export default function ContractModal({
         return
       }
 
-      const nombreArl = data?.arls?.nombre || ''
+      const nombreArl = (data?.arls as any)?.nombre || ''
       console.log('✅ ARL encontrada:', nombreArl)
       setArlActiva(nombreArl)
 
@@ -447,7 +447,7 @@ export default function ContractModal({
       
       // Forzar recálculo inicial después de un pequeño delay
       setTimeout(() => {
-        if (formData.salario > 0) {
+        if (formData.salario && formData.salario > 0) {
           const nuevoAuxilio = calculateAuxilioTransporte(formData.salario)
           console.log('🔄 Recálculo inicial al abrir modal:', nuevoAuxilio)
           setFormData(prev => ({ ...prev, auxilio_transporte: nuevoAuxilio }))
@@ -800,7 +800,7 @@ export default function ContractModal({
       auxilioActual: formData.auxilio_transporte 
     })
     
-    if (formData.salario > 0 && salarioMinimo > 0 && auxilioTransporteParametro > 0) {
+    if (formData.salario && formData.salario > 0 && salarioMinimo > 0 && auxilioTransporteParametro > 0) {
       const nuevoAuxilio = calculateAuxilioTransporte(formData.salario)
       console.log('🆕 Nuevo auxilio calculado:', nuevoAuxilio, 'vs actual:', formData.auxilio_transporte)
       

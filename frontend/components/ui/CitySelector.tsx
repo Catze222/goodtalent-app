@@ -81,10 +81,10 @@ export default function CitySelector({
       // Extraer ciudades únicas
       const uniqueCities = data?.reduce((acc: City[], item) => {
         const city = item.ciudades
-        if (city && !acc.find(c => c.id === city.id)) {
+        if (city && !acc.find(c => c.id === (city as any).id)) {
           acc.push({
-            id: city.id,
-            nombre: city.nombre
+            id: (city as any).id,
+            nombre: (city as any).nombre
           })
         }
         return acc

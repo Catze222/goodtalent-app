@@ -85,7 +85,7 @@ export default function OnboardingDetailModal({
         return
       }
 
-      const nombreArl = data?.arls?.nombre || ''
+      const nombreArl = (data?.arls as any)?.nombre || ''
       setArlActiva(nombreArl)
     } catch (error: any) {
       if (error.code !== 'PGRST116') {
@@ -127,7 +127,7 @@ export default function OnboardingDetailModal({
         return
       }
 
-      const nombreCaja = data?.cajas_compensacion?.nombre || ''
+      const nombreCaja = (data?.cajas_compensacion as any)?.nombre || ''
       setCajaActiva(nombreCaja)
     } catch (error: any) {
       if (error.code !== 'PGRST116') {
