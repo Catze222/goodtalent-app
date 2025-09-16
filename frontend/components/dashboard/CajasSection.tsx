@@ -318,7 +318,7 @@ export default function CajasSection({ empresaId, isCreating, onCajasChange, onC
         <div className="space-y-4">
           {cajasToShow.map((caja, index) => (
             <div
-              key={isCreating ? `new-${index}` : caja.id}
+              key={isCreating ? `new-${index}` : (caja as EmpresaCajaActual).id}
               className="bg-white border-2 border-gray-100 rounded-xl p-5 hover:border-[#87E0E0] hover:shadow-lg transition-all duration-200"
             >
               <div className="flex items-center justify-between">
