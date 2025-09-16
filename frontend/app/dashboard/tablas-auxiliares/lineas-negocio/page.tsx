@@ -58,7 +58,11 @@ export default function BusinessLinesPage() {
   const [selectedBusinessLine, setSelectedBusinessLine] = useState<BusinessLine | null>(null)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
   const [updating, setUpdating] = useState(false)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [toast, setToast] = useState<{
+    show: boolean
+    message: string
+    type: 'success' | 'error'
+  }>({ show: false, message: '', type: 'success' })
   
   const router = useRouter()
   const { canManageAuxTables, hasPermission, loading: permissionsLoading, permissions } = usePermissions()
@@ -204,8 +208,7 @@ export default function BusinessLinesPage() {
   }
 
   const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
+    setToast({ show: true, message, type })
   }
 
   if (permissionsLoading) {
@@ -571,13 +574,12 @@ export default function BusinessLinesPage() {
       />
 
       {/* Toast */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      <Toast
+        open={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ ...toast, show: false })}
+      />
     </div>
   )
 }
