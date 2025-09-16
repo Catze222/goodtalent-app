@@ -326,11 +326,11 @@ export default function CajasSection({ empresaId, isCreating, onCajasChange, onC
                   <div className="flex items-center space-x-2 mb-2">
                     <MapPin className="h-5 w-5 text-[#065C5C]" />
                     <h4 className="font-semibold text-[#004C4C] text-base">
-                      {isCreating ? getCiudadNombre(caja.ciudad_id) : caja.ciudad_nombre}
+                      {isCreating ? getCiudadNombre(caja.ciudad_id) : (caja as EmpresaCajaActual).ciudad_nombre}
                     </h4>
                   </div>
                   <p className="text-base text-gray-700 mb-3 font-medium">
-                    {isCreating ? getCajaNombre(caja.caja_id) : caja.caja_nombre}
+                    {isCreating ? getCajaNombre(caja.caja_id) : (caja as EmpresaCajaActual).caja_nombre}
                   </p>
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-3 w-3 text-gray-400" />
