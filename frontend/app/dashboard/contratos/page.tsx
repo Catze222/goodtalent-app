@@ -493,7 +493,6 @@ export default function ContratosPage() {
             setDataLoaded(false)
             loadContracts()
           }}
-          onReportNovelty={handleReportNovelty}
         />
         </div>
       )}

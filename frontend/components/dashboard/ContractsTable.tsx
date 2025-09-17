@@ -29,9 +29,11 @@ import { formatDateColombia } from '../../utils/dateUtils'
 import { ContractStatusCompact } from '../ui/ContractStatusBadges'
 import ContractApprovalButton from '../ui/ContractApprovalButton'
 import DeleteContractModal from '../ui/DeleteContractModal'
-import ReportNoveltyButton from '../ui/ReportNoveltyButton'
 import OnboardingDetailModal from '../ui/OnboardingDetailModal'
 import ConfirmationModal from '../ui/ConfirmationModal'
+import NovedadButton from './NovedadButton'
+import { ContractRowWithCurrentData } from './ContractRowWithCurrentData'
+import { ContractAfiliacionesSection } from './ContractAfiliacionesSection'
 
 interface ContractsTableProps {
   contracts: Contract[]
@@ -40,7 +42,6 @@ interface ContractsTableProps {
   canUpdate: boolean
   canDelete: boolean
   onApprove?: (contract: Contract) => void
-  onReportNovelty?: (contract: Contract) => void
 }
 
 type OnboardingField = 
@@ -63,15 +64,20 @@ type OnboardingField =
  * Tabla moderna de contratos con scroll unificado y edición inline
  * Optimizada para productividad con acciones al inicio y todos los campos editables
  */
-export default function ContractsTable({ 
-  contracts, 
-  onEdit, 
-  onUpdate, 
-  canUpdate, 
+export default function ContractsTable({
+  contracts,
+  onEdit,
+  onUpdate,
+  canUpdate,
   canDelete,
-  onApprove,
-  onReportNovelty
+  onApprove
 }: ContractsTableProps) {
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+  
+  const handleNovedadSuccess = () => {
+    setRefreshTrigger(prev => prev + 1)
+    onUpdate()
+  }
   const [loadingInline, setLoadingInline] = useState<Set<string>>(new Set())
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [contractToDelete, setContractToDelete] = useState<Contract | null>(null)
@@ -600,83 +606,94 @@ export default function ContractsTable({
               .map((contract) => {
               const isExpanded = expandedRows.has(contract.id!)
               const progress = contract.contracts_onboarding_progress || 0
-              const fullName = contract.contracts_full_name || 
-                `${contract.primer_nombre} ${contract.primer_apellido}`
 
               return (
-                <div key={contract.id!}>
-                  {/* Fila principal - Dentro del scroll unificado */}
-                  <div className={`grid gap-2 p-3 hover:bg-gray-50 transition-colors`} style={{gridTemplateColumns: generateGridColumns()}}>
-                    
-                    {/* Acciones al principio */}
-                    <div className="flex flex-col items-start space-y-1">
-                      <div className="flex items-center space-x-1">
-                        <button
-                          onClick={() => toggleRowExpansion(contract.id!)}
-                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                          title="Ver detalles"
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </button>
-                        {getContractStatusConfig(contract).can_edit ? (
-                          canUpdate && (
-                            <button
-                              onClick={() => onEdit(contract)}
-                              className="p-1 text-[#004C4C] hover:text-[#065C5C] transition-colors"
-                              title="Editar contrato"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                          )
-                        ) : (
-                          <button
-                            onClick={() => onEdit(contract)}
-                            className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-                            title="Ver contrato (solo lectura)"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                        )}
-                        {canDelete && getContractStatusConfig(contract).can_delete && (
-                          <button
-                            onClick={() => setContractToDelete(contract)}
-                            className="p-1 text-red-500 hover:text-red-700 transition-colors"
-                            title="Eliminar contrato"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                      
-                      {/* Botón de aprobación */}
-                      {getContractStatusConfig(contract).can_approve && onApprove && (
-                        <ContractApprovalButton 
-                          contract={contract} 
-                          onSuccess={() => onApprove(contract)}
-                          className="text-xs px-2 py-1"
-                        />
-                      )}
-                      
-                      {/* Botón de reportar novedad */}
-                      {!getContractStatusConfig(contract).can_approve && contract.status_aprobacion === 'aprobado' && onReportNovelty && (
-                        <ReportNoveltyButton 
-                          contract={contract} 
-                          onReport={onReportNovelty}
-                          size="sm"
-                        />
-                      )}
-                    </div>
-
-                    {/* Empleado */}
+                <ContractRowWithCurrentData key={contract.id!} contract={contract} refreshTrigger={refreshTrigger}>
+                  {(currentData) => (
                     <div>
-                      <div className="font-medium text-gray-900 text-base">{fullName}</div>
-                      <div className="text-sm text-gray-500 mb-1">{contract.tipo_identificacion} {contract.numero_identificacion}</div>
-                      <ContractStatusCompact contract={contract} />
-                    </div>
+                      {/* Fila principal - Dentro del scroll unificado */}
+                      <div className={`grid gap-2 p-3 hover:bg-gray-50 transition-colors`} style={{gridTemplateColumns: generateGridColumns()}}>
+                        
+                        {/* Acciones al principio */}
+                        <div className="flex flex-col items-start space-y-1">
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => toggleRowExpansion(contract.id!)}
+                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                              title="Ver detalles"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
+                            {getContractStatusConfig(contract).can_edit ? (
+                              canUpdate && (
+                                <button
+                                  onClick={() => onEdit(contract)}
+                                  className="p-1 text-[#004C4C] hover:text-[#065C5C] transition-colors"
+                                  title="Editar contrato"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                              )
+                            ) : (
+                              <button
+                                onClick={() => onEdit(contract)}
+                                className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                                title="Ver contrato (solo lectura)"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                            )}
+                            {canDelete && getContractStatusConfig(contract).can_delete && (
+                              <button
+                                onClick={() => setContractToDelete(contract)}
+                                className="p-1 text-red-500 hover:text-red-700 transition-colors"
+                                title="Eliminar contrato"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                          
+                          {/* Botón de aprobación */}
+                          {getContractStatusConfig(contract).can_approve && onApprove && (
+                            <ContractApprovalButton 
+                              contract={contract} 
+                              onSuccess={() => onApprove(contract)}
+                              className="text-xs px-2 py-1"
+                            />
+                          )}
+                          
+                          {/* Botón de novedades */}
+                          {contract.status_aprobacion === 'aprobado' && (
+                            <NovedadButton
+                              contractId={contract.id!}
+                              contractName={currentData.fullName}
+                              onSuccess={handleNovedadSuccess}
+                              className="text-xs px-2 py-1"
+                            />
+                          )}
+                          
+                        </div>
+
+                        {/* Empleado */}
+                        <div>
+                          <div className="font-medium text-gray-900 text-base">
+                            {currentData.loading ? (
+                              <div className="flex items-center space-x-2">
+                                <span>{contract.contracts_full_name || `${contract.primer_nombre} ${contract.primer_apellido}`}</span>
+                                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                              </div>
+                            ) : (
+                              currentData.fullName
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500 mb-1">{contract.tipo_identificacion} {contract.numero_identificacion}</div>
+                          <ContractStatusCompact contract={contract} />
+                        </div>
 
                     {/* Empresa */}
                     <div>
@@ -695,7 +712,13 @@ export default function ContractsTable({
                     {/* Contrato */}
                     <div>
                       <div className="text-base font-medium truncate">{contract.numero_contrato_helisa}</div>
-                      <div className="text-sm text-gray-500">{contract.cargo || '-'}</div>
+                      <div className="text-sm text-gray-500">
+                        {currentData.loading ? (
+                          contract.cargo || '-'
+                        ) : (
+                          currentData.cargo || '-'
+                        )}
+                      </div>
                     </div>
 
                     {/* Fecha ingreso */}
@@ -705,19 +728,33 @@ export default function ContractsTable({
 
                     {/* Fecha terminación */}
                     <div className="text-base">
-                      {contract.fecha_fin ? (
-                        <span className="text-orange-600 font-medium">
-                          {formatDate(contract.fecha_fin)}
-                        </span>
+                      {currentData.loading ? (
+                        contract.fecha_fin ? (
+                          <span className="text-orange-600 font-medium">
+                            {formatDate(contract.fecha_fin)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">Indefinido</span>
+                        )
                       ) : (
-                        <span className="text-gray-400">Indefinido</span>
+                        currentData.fecha_fin_actual ? (
+                          <span className="text-orange-600 font-medium">
+                            {formatDate(currentData.fecha_fin_actual)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">Indefinido</span>
+                        )
                       )}
                     </div>
 
                     {/* Total Remuneración */}
                     <div className="text-base">
                       <div className="font-medium text-green-700">
-                        {formatCurrencyLocal(calculateTotalRemuneration(contract))}
+                        {formatCurrencyLocal(
+                          (currentData.salario || 0) + 
+                          (currentData.auxilio_salarial_actual || 0) + 
+                          (currentData.auxilio_no_salarial_actual || 0)
+                        )}
                       </div>
                       <div className="text-sm text-gray-500">
                         Total remuneración
@@ -845,11 +882,29 @@ export default function ContractsTable({
                       <div className="space-y-2">
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Email:</span>
-                          <span className="text-gray-800">{contract.email || 'No registrado'}</span>
+                          <span className="text-gray-800">
+                            {currentData.loading ? (
+                              <div className="flex items-center space-x-1">
+                                <span>{contract.email || 'No registrado'}</span>
+                                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                              </div>
+                            ) : (
+                              currentData.email || 'No registrado'
+                            )}
+                          </span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Teléfono:</span>
-                          <span className="text-gray-800">{contract.celular || 'No registrado'}</span>
+                          <span className="text-gray-800">
+                            {currentData.loading ? (
+                              <div className="flex items-center space-x-1">
+                                <span>{contract.celular || 'No registrado'}</span>
+                                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                              </div>
+                            ) : (
+                              currentData.celular || 'No registrado'
+                            )}
+                          </span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">F. Nacimiento:</span>
@@ -869,7 +924,7 @@ export default function ContractsTable({
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Ciudad Labora:</span>
-                          <span className="text-gray-800">{contract.ciudad_labora || 'No especificado'}</span>
+                          <span className="text-gray-800">{currentData.ciudad_labora_actual || 'No especificado'}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Tipo Salario:</span>
@@ -877,7 +932,16 @@ export default function ContractsTable({
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Aporta SENA:</span>
-                          <span className="text-gray-800">{contract.base_sena ? 'Sí' : 'No'}</span>
+                          <span className="text-gray-800">
+                            {currentData.loading ? (
+                              <div className="flex items-center space-x-1">
+                                <span>{contract.base_sena ? 'Sí' : 'No'}</span>
+                                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                              </div>
+                            ) : (
+                              currentData.aporta_sena_actual ? 'Sí' : 'No'
+                            )}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -888,19 +952,25 @@ export default function ContractsTable({
                       <div className="space-y-2">
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Salario Base:</span>
-                          <span className="text-gray-800 font-medium">{formatCurrencyLocal(contract.salario)}</span>
+                          <span className="text-gray-800 font-medium">{formatCurrencyLocal(currentData.salario)}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Auxilio Salarial:</span>
-                          <span className="text-gray-800">{formatCurrencyLocal(contract.auxilio_salarial)}</span>
+                          <span className="text-gray-800">{formatCurrencyLocal(currentData.auxilio_salarial_actual)}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Concepto Aux. Salarial:</span>
-                          <span className="text-gray-800">{contract.auxilio_salarial_concepto || 'No especificado'}</span>
+                          <span className="text-gray-800">{currentData.auxilio_salarial_concepto_actual || contract.auxilio_salarial_concepto || 'No especificado'}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">💰 Total Remuneración:</span>
-                          <span className="text-green-700 font-bold text-lg">{formatCurrencyLocal(calculateTotalRemuneration(contract))}</span>
+                          <span className="text-green-700 font-bold text-lg">
+                            {formatCurrencyLocal(
+                              (currentData.salario || 0) + 
+                              (currentData.auxilio_salarial_actual || 0) + 
+                              (currentData.auxilio_no_salarial_actual || 0)
+                            )}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -911,19 +981,28 @@ export default function ContractsTable({
                       <div className="space-y-2">
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Auxilio No Salarial:</span>
-                          <span className="text-gray-800">{formatCurrencyLocal(contract.auxilio_no_salarial)}</span>
+                          <span className="text-gray-800">{formatCurrencyLocal(currentData.auxilio_no_salarial_actual)}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Concepto Aux. No Salarial:</span>
-                          <span className="text-gray-800">{contract.auxilio_no_salarial_concepto || 'No especificado'}</span>
+                          <span className="text-gray-800">{currentData.auxilio_no_salarial_concepto_actual || contract.auxilio_no_salarial_concepto || 'No especificado'}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Auxilio Transporte:</span>
-                          <span className="text-gray-800">{formatCurrencyLocal(contract.auxilio_transporte)}</span>
+                          <span className="text-gray-800">{formatCurrencyLocal(currentData.auxilio_transporte_actual)}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">🏛️ Aporta SENA:</span>
-                          <span className="text-gray-800">{contract.base_sena ? 'Sí' : 'No'}</span>
+                          <span className="text-gray-800">
+                            {currentData.loading ? (
+                              <div className="flex items-center space-x-1">
+                                <span>{contract.base_sena ? 'Sí' : 'No'}</span>
+                                <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                              </div>
+                            ) : (
+                              currentData.aporta_sena_actual ? 'Sí' : 'No'
+                            )}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -976,6 +1055,12 @@ export default function ContractsTable({
                       </div>
                     </div>
 
+                    {/* Afiliaciones */}
+                    <ContractAfiliacionesSection 
+                      contract={contract}
+                      refreshTrigger={refreshTrigger}
+                    />
+
                     {/* Documentos y Observaciones - Expandido */}
                     <div className="flex-1">
                       <div className="font-semibold text-gray-800 mb-3 text-base h-6">Documentos</div>
@@ -1014,7 +1099,9 @@ export default function ContractsTable({
                 </div>
               )}
 
-                </div>
+                    </div>
+                  )}
+                </ContractRowWithCurrentData>
               )
             })}
           </div>
@@ -1027,14 +1114,23 @@ export default function ContractsTable({
           .filter(contract => contract.id) // Filtrar contratos sin ID
           .map((contract) => {
           const statusConfig = getContractStatusConfig(contract)
-          const fullName = contract.contracts_full_name || 
-            `${contract.primer_nombre} ${contract.primer_apellido}`
 
           return (
-            <div key={contract.id!} className="p-4 space-y-3">
-              {/* Info básica */}
-              <div className="space-y-2">
-                <div className="font-medium text-gray-900 text-lg">{fullName}</div>
+            <ContractRowWithCurrentData key={contract.id!} contract={contract} refreshTrigger={refreshTrigger}>
+              {(currentData) => (
+                <div className="p-4 space-y-3">
+                  {/* Info básica */}
+                  <div className="space-y-2">
+                    <div className="font-medium text-gray-900 text-lg">
+                      {currentData.loading ? (
+                        <div className="flex items-center space-x-2">
+                          <span>{contract.contracts_full_name || `${contract.primer_nombre} ${contract.primer_apellido}`}</span>
+                          <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                        </div>
+                      ) : (
+                        currentData.fullName
+                      )}
+                    </div>
                 <div className="flex flex-wrap gap-2 text-sm">
                   <span className={`px-2 py-1 text-xs rounded-full font-medium ${
                     contract.empresa_interna === 'Good' 
@@ -1048,8 +1144,12 @@ export default function ContractsTable({
                   </span>
                 </div>
                 <div className="text-sm text-gray-500">
-                  {contract.ciudad_labora && `${contract.ciudad_labora} • `}
-                  {contract.cargo || 'Sin cargo definido'}
+                  {currentData.ciudad_labora_actual && `${currentData.ciudad_labora_actual} • `}
+                  {currentData.loading ? (
+                    contract.cargo || 'Sin cargo definido'
+                  ) : (
+                    currentData.cargo || 'Sin cargo definido'
+                  )}
                 </div>
               </div>
 
@@ -1090,14 +1190,15 @@ export default function ContractsTable({
                     />
                   )}
                   
-                  {/* Botón de reportar novedad */}
-                  {!statusConfig.can_approve && contract.status_aprobacion === 'aprobado' && onReportNovelty && (
-                    <ReportNoveltyButton 
-                      contract={contract} 
-                      onReport={onReportNovelty}
-                      size="sm"
+                  {/* Botón de novedades */}
+                  {contract.status_aprobacion === 'aprobado' && (
+                    <NovedadButton
+                      contractId={contract.id!}
+                      contractName={currentData.fullName}
+                      onSuccess={handleNovedadSuccess}
                     />
                   )}
+                  
                   
                   {/* Botón de eliminar */}
                   {canDelete && statusConfig.can_delete && (
@@ -1111,7 +1212,9 @@ export default function ContractsTable({
                   )}
                 </div>
               </div>
-            </div>
+                </div>
+              )}
+            </ContractRowWithCurrentData>
           )
         })}
       </div>
