@@ -49,6 +49,17 @@ interface ContractCurrentData {
   // Fecha de finalización actual (con prórrogas)
   fecha_fin_actual: string | null
   
+  // Beneficiarios actualizados
+  beneficiario_hijo_actual: number | null
+  beneficiario_madre_actual: number | null
+  beneficiario_padre_actual: number | null
+  beneficiario_conyuge_actual: number | null
+  
+  // Información de terminación
+  is_terminated: boolean
+  fecha_terminacion: string | null
+  tipo_terminacion: string | null
+  
   // Estado de carga
   loading: boolean
   error: string | null
@@ -76,6 +87,13 @@ export const useContractCurrentData = (contract: Contract, refreshTrigger?: numb
     ciudad_labora_actual: contract.ciudad_labora ?? null,
     aporta_sena_actual: contract.base_sena ?? true,
     fecha_fin_actual: contract.fecha_fin ?? null,
+    beneficiario_hijo_actual: contract.beneficiario_hijo ?? null,
+    beneficiario_madre_actual: contract.beneficiario_madre ?? null,
+    beneficiario_padre_actual: contract.beneficiario_padre ?? null,
+    beneficiario_conyuge_actual: contract.beneficiario_conyuge ?? null,
+    is_terminated: false,
+    fecha_terminacion: null,
+    tipo_terminacion: null,
     loading: true,
     error: null
   })
@@ -124,8 +142,24 @@ export const useContractCurrentData = (contract: Contract, refreshTrigger?: numb
           .eq('tipo_tiempo', 'prorroga')
           .order('created_at', { ascending: false })
           .limit(1)
+
+        // 6. Obtener beneficiarios más recientes
+        const { data: beneficiarios } = await supabase
+          .from('novedades_beneficiarios')
+          .select('tipo_beneficiario, valor_nuevo, created_at')
+          .eq('contract_id', contract.id)
+          .order('created_at', { ascending: false })
+
+        // 7. Obtener información de terminación (sin error si no existe)
+        const { data: terminacionArray } = await supabase
+          .from('novedades_terminacion')
+          .select('fecha, tipo_terminacion, created_at')
+          .eq('contract_id', contract.id)
+          .limit(1)
         
-        // 6. Resolver nombre de ciudad si es un UUID
+        const terminacion = terminacionArray?.[0] || null
+        
+        // 8. Resolver nombre de ciudad si es un UUID
         let ciudadNombre = contract.ciudad_labora
         if (contract.ciudad_labora && isUUID(contract.ciudad_labora)) {
           try {
@@ -217,6 +251,29 @@ export const useContractCurrentData = (contract: Contract, refreshTrigger?: numb
           
           // Fecha fin - usar prórroga más reciente si existe
           fecha_fin_actual: prorrogas?.[0]?.nueva_fecha_fin || prev.fecha_fin_actual,
+          
+          // Beneficiarios - usar novedades más recientes si existen
+          beneficiario_hijo_actual: (() => {
+            const ultimoHijo = beneficiarios?.find(b => b.tipo_beneficiario === 'hijo')
+            return ultimoHijo ? ultimoHijo.valor_nuevo : prev.beneficiario_hijo_actual
+          })(),
+          beneficiario_madre_actual: (() => {
+            const ultimaMadre = beneficiarios?.find(b => b.tipo_beneficiario === 'madre')
+            return ultimaMadre ? ultimaMadre.valor_nuevo : prev.beneficiario_madre_actual
+          })(),
+          beneficiario_padre_actual: (() => {
+            const ultimoPadre = beneficiarios?.find(b => b.tipo_beneficiario === 'padre')
+            return ultimoPadre ? ultimoPadre.valor_nuevo : prev.beneficiario_padre_actual
+          })(),
+          beneficiario_conyuge_actual: (() => {
+            const ultimoConyuge = beneficiarios?.find(b => b.tipo_beneficiario === 'conyuge')
+            return ultimoConyuge ? ultimoConyuge.valor_nuevo : prev.beneficiario_conyuge_actual
+          })(),
+          
+          // Información de terminación
+          is_terminated: !!terminacion,
+          fecha_terminacion: terminacion?.fecha || null,
+          tipo_terminacion: terminacion?.tipo_terminacion || null,
           
           loading: false,
           error: null

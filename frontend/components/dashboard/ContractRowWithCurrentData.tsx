@@ -23,6 +23,13 @@ interface ContractRowWithCurrentDataProps {
     auxilio_no_salarial_concepto_actual: string | null
     aporta_sena_actual: boolean
     fecha_fin_actual: string | null
+    beneficiario_hijo_actual: number | null
+    beneficiario_madre_actual: number | null
+    beneficiario_padre_actual: number | null
+    beneficiario_conyuge_actual: number | null
+    is_terminated: boolean
+    fecha_terminacion: string | null
+    tipo_terminacion: string | null
     loading: boolean
   }) => React.ReactNode
 }
@@ -57,6 +64,13 @@ export const ContractRowWithCurrentData: React.FC<ContractRowWithCurrentDataProp
         auxilio_no_salarial_concepto_actual: currentData.auxilio_no_salarial_concepto_actual,
         aporta_sena_actual: currentData.aporta_sena_actual,
         fecha_fin_actual: currentData.fecha_fin_actual,
+        beneficiario_hijo_actual: currentData.beneficiario_hijo_actual,
+        beneficiario_madre_actual: currentData.beneficiario_madre_actual,
+        beneficiario_padre_actual: currentData.beneficiario_padre_actual,
+        beneficiario_conyuge_actual: currentData.beneficiario_conyuge_actual,
+        is_terminated: currentData.is_terminated,
+        fecha_terminacion: currentData.fecha_terminacion,
+        tipo_terminacion: currentData.tipo_terminacion,
         loading: currentData.loading
       })}
     </>

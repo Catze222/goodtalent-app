@@ -14,7 +14,8 @@ import {
   FileText,
   CheckCircle,
   Trash2,
-  Eye
+  Eye,
+  History
 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { 
@@ -34,6 +35,7 @@ import ConfirmationModal from '../ui/ConfirmationModal'
 import NovedadButton from './NovedadButton'
 import { ContractRowWithCurrentData } from './ContractRowWithCurrentData'
 import { ContractAfiliacionesSection } from './ContractAfiliacionesSection'
+import ContractHistoryModal from './ContractHistoryModal'
 
 interface ContractsTableProps {
   contracts: Contract[]
@@ -105,6 +107,8 @@ export default function ContractsTable({
     onConfirm: () => {},
     type: 'warning'
   })
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [historyContract, setHistoryContract] = useState<Contract | null>(null)
 
   // Usar formateo de fecha correcto para Colombia (evita problema de zona horaria)
   const formatDate = formatDateColombia
@@ -647,6 +651,18 @@ export default function ContractsTable({
                                 <Eye className="h-4 w-4" />
                               </button>
                             )}
+                            
+                            {/* Botón de historial compacto */}
+                            <button
+                              onClick={() => {
+                                setHistoryContract(contract)
+                                setShowHistoryModal(true)
+                              }}
+                              className="p-1 text-[#004C4C] hover:text-[#065C5C] transition-colors"
+                              title="Ver historial completo del contrato"
+                            >
+                              <History className="h-4 w-4" />
+                            </button>
                             {canDelete && getContractStatusConfig(contract).can_delete && (
                               <button
                                 onClick={() => setContractToDelete(contract)}
@@ -668,7 +684,7 @@ export default function ContractsTable({
                           )}
                           
                           {/* Botón de novedades */}
-                          {contract.status_aprobacion === 'aprobado' && (
+                          {contract.status_aprobacion === 'aprobado' && !currentData.is_terminated && (
                             <NovedadButton
                               contractId={contract.id!}
                               contractName={currentData.fullName}
@@ -692,7 +708,11 @@ export default function ContractsTable({
                             )}
                           </div>
                           <div className="text-sm text-gray-500 mb-1">{contract.tipo_identificacion} {contract.numero_identificacion}</div>
-                          <ContractStatusCompact contract={contract} />
+                          <ContractStatusCompact 
+                            contract={contract} 
+                            isTerminated={currentData.is_terminated}
+                            fechaTerminacion={currentData.fecha_terminacion}
+                          />
                         </div>
 
                     {/* Empresa */}
@@ -730,17 +750,56 @@ export default function ContractsTable({
                     <div className="text-base">
                       {currentData.loading ? (
                         contract.fecha_fin ? (
-                          <span className="text-orange-600 font-medium">
-                            {formatDate(contract.fecha_fin)}
-                          </span>
+                          <div>
+                            <span className="text-orange-600 font-medium">
+                              {formatDate(contract.fecha_fin)}
+                            </span>
+                          </div>
                         ) : (
                           <span className="text-gray-400">Indefinido</span>
                         )
+                      ) : currentData.is_terminated ? (
+                        <div>
+                          <span className="text-red-600 font-bold">
+                            Terminado: {formatDate(currentData.fecha_terminacion!)}
+                          </span>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {(() => {
+                              if (!currentData.fecha_terminacion || !contract.fecha_ingreso) return ''
+                              const fechaInicio = new Date(contract.fecha_ingreso)
+                              const fechaTerminacion = new Date(currentData.fecha_terminacion)
+                              const diffTime = fechaTerminacion.getTime() - fechaInicio.getTime()
+                              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                              return `Duró ${diffDays} días`
+                            })()}
+                          </div>
+                        </div>
                       ) : (
                         currentData.fecha_fin_actual ? (
-                          <span className="text-orange-600 font-medium">
-                            {formatDate(currentData.fecha_fin_actual)}
-                          </span>
+                          <div>
+                            <span className="text-orange-600 font-medium">
+                              {formatDate(currentData.fecha_fin_actual)}
+                            </span>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {(() => {
+                                const fechaFin = new Date(currentData.fecha_fin_actual)
+                                const hoy = new Date()
+                                hoy.setHours(0, 0, 0, 0)
+                                fechaFin.setHours(0, 0, 0, 0)
+                                
+                                const diffTime = fechaFin.getTime() - hoy.getTime()
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+                                
+                                if (diffDays > 0) {
+                                  return `Faltan ${diffDays} días`
+                                } else if (diffDays === 0) {
+                                  return 'Vence hoy'
+                                } else {
+                                  return `Venció hace ${Math.abs(diffDays)} días`
+                                }
+                              })()}
+                            </div>
+                          </div>
                         ) : (
                           <span className="text-gray-400">Indefinido</span>
                         )
@@ -1017,19 +1076,19 @@ export default function ContractsTable({
                       <div className="space-y-2">
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Hijos:</span>
-                          <span className="text-gray-800">{contract.beneficiario_hijo}</span>
+                          <span className="text-gray-800">{currentData.beneficiario_hijo_actual ?? contract.beneficiario_hijo ?? 0}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Madre:</span>
-                          <span className="text-gray-800">{contract.beneficiario_madre === 1 ? 'Sí' : 'No'}</span>
+                          <span className="text-gray-800">{(currentData.beneficiario_madre_actual ?? contract.beneficiario_madre ?? 0) === 1 ? 'Sí' : 'No'}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Padre:</span>
-                          <span className="text-gray-800">{contract.beneficiario_padre === 1 ? 'Sí' : 'No'}</span>
+                          <span className="text-gray-800">{(currentData.beneficiario_padre_actual ?? contract.beneficiario_padre ?? 0) === 1 ? 'Sí' : 'No'}</span>
                         </div>
                         <div className="flex flex-col">
                           <span className="text-gray-500 text-xs font-medium">Cónyuge:</span>
-                          <span className="text-gray-800">{contract.beneficiario_conyuge === 1 ? 'Sí' : 'No'}</span>
+                          <span className="text-gray-800">{(currentData.beneficiario_conyuge_actual ?? contract.beneficiario_conyuge ?? 0) === 1 ? 'Sí' : 'No'}</span>
                         </div>
                       </div>
                     </div>
@@ -1182,6 +1241,19 @@ export default function ContractsTable({
                     </button>
                   )}
                   
+                  {/* Botón de historial */}
+                  <button
+                    onClick={() => {
+                      setHistoryContract(contract)
+                      setShowHistoryModal(true)
+                    }}
+                    className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white rounded-lg text-sm font-medium hover:from-[#065C5C] hover:to-[#0A6A6A] transition-all duration-200 shadow-sm hover:shadow-md transform hover:scale-105"
+                    title="Ver historial completo del contrato"
+                  >
+                    <History className="h-4 w-4" />
+                    <span>Historial</span>
+                  </button>
+                  
                   {/* Botón de aprobar */}
                   {statusConfig.can_approve && onApprove && (
                     <ContractApprovalButton 
@@ -1190,14 +1262,14 @@ export default function ContractsTable({
                     />
                   )}
                   
-                  {/* Botón de novedades */}
-                  {contract.status_aprobacion === 'aprobado' && (
-                    <NovedadButton
-                      contractId={contract.id!}
-                      contractName={currentData.fullName}
-                      onSuccess={handleNovedadSuccess}
-                    />
-                  )}
+                          {/* Botón de novedades */}
+                          {contract.status_aprobacion === 'aprobado' && !currentData.is_terminated && (
+                            <NovedadButton
+                              contractId={contract.id!}
+                              contractName={currentData.fullName}
+                              onSuccess={handleNovedadSuccess}
+                            />
+                          )}
                   
                   
                   {/* Botón de eliminar */}
@@ -1302,6 +1374,16 @@ export default function ContractsTable({
         type={confirmModalData.type}
         confirmText="Sí, continuar"
         cancelText="Cancelar"
+      />
+
+      {/* Contract History Modal */}
+      <ContractHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => {
+          setShowHistoryModal(false)
+          setHistoryContract(null)
+        }}
+        contract={historyContract}
       />
     </div>
   )

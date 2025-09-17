@@ -8,6 +8,9 @@ import { NovedadCambioCargoModal } from './NovedadCambioCargoModal'
 import { NovedadEntidadesModal } from './NovedadEntidadesModal'
 import NovedadEconomicasModal from './NovedadEconomicasModal'
 import NovedadTiempoLaboralModal from './NovedadTiempoLaboralModal'
+import NovedadIncapacidadesModal from './NovedadIncapacidadesModal'
+import NovedadBeneficiariosModal from './NovedadBeneficiariosModal'
+import NovedadTerminacionModal from './NovedadTerminacionModal'
 
 /**
  * Botón principal para crear novedades
@@ -118,27 +121,40 @@ export default function NovedadButton({
           />
         )
       
-      // TODO: Agregar otros modales específicos
       case 'incapacidad':
+        return (
+          <NovedadIncapacidadesModal
+            isOpen={showSpecificModal}
+            onClose={handleCloseSpecificModal}
+            onBack={handleBackToSelector}
+            onSuccess={handleSuccess}
+            contractId={contractId}
+            contractName={contractName}
+          />
+        )
+      
       case 'beneficiarios':
+        return (
+          <NovedadBeneficiariosModal
+            isOpen={showSpecificModal}
+            onClose={handleCloseSpecificModal}
+            onBack={handleBackToSelector}
+            onSuccess={handleSuccess}
+            contractId={contractId}
+            contractName={contractName}
+          />
+        )
+      
       case 'terminacion':
         return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {selectedType.title}
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Este modal está en desarrollo
-              </p>
-              <button
-                onClick={handleCloseSpecificModal}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
+          <NovedadTerminacionModal
+            isOpen={showSpecificModal}
+            onClose={handleCloseSpecificModal}
+            onBack={handleBackToSelector}
+            onSuccess={handleSuccess}
+            contractId={contractId}
+            contractName={contractName}
+          />
         )
       
       default:

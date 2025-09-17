@@ -73,13 +73,29 @@ export default function ContractStatusBadges({ contract, showDetailed = false }:
 }
 
 // Componente compacto para usar en tarjetas
-export function ContractStatusCompact({ contract }: { contract: Contract }) {
+export function ContractStatusCompact({ 
+  contract, 
+  isTerminated = false, 
+  fechaTerminacion = null 
+}: { 
+  contract: Contract
+  isTerminated?: boolean
+  fechaTerminacion?: string | null
+}) {
   const statusConfig = getContractStatusConfig(contract)
   const aprobacionConfig = getStatusAprobacionConfig(statusConfig.status_aprobacion)
-  const vigenciaConfig = getStatusVigenciaConfig(statusConfig.status_vigencia, statusConfig.days_until_expiry)
+  
+  // Si está terminado por novedad, usar estado de terminado
+  const vigenciaConfig = isTerminated 
+    ? { 
+        label: 'Terminado', 
+        color: 'bg-red-100 text-red-800 border-red-200', 
+        icon: '🔴' 
+      }
+    : getStatusVigenciaConfig(statusConfig.status_vigencia, statusConfig.days_until_expiry)
 
   // Determinar el estado más crítico para mostrar
-  const isCritical = statusConfig.status_vigencia === 'terminado' || 
+  const isCritical = isTerminated || statusConfig.status_vigencia === 'terminado' || 
     (statusConfig.days_until_expiry !== null && statusConfig.days_until_expiry <= 7)
   
   const isDraft = statusConfig.status_aprobacion === 'borrador'
