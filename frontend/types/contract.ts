@@ -27,6 +27,15 @@ export interface Contract {
   fecha_ingreso?: string | null
   tipo_contrato?: string | null
   fecha_fin?: string | null
+  // Estado de contratos fijos (períodos)
+  contract_status?: {
+    total_periodos?: number
+    periodo_actual?: number
+    años_totales?: number
+    dias_totales?: number
+    debe_ser_indefinido?: boolean
+    alerta_legal?: string
+  } | null
   tipo_salario?: string | null
   salario?: number | null
   auxilio_salarial?: number | null

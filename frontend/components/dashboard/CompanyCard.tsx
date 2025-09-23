@@ -9,6 +9,12 @@ interface Company {
   id: string
   name: string
   tax_id: string
+  grupo_empresarial_id?: string
+  grupo_empresarial?: {
+    id: string
+    nombre: string
+    descripcion?: string
+  }
   accounts_contact_name?: string
   accounts_contact_email?: string
   accounts_contact_phone?: string
@@ -141,10 +147,13 @@ export default function CompanyCard({
 
         {/* Company Header - banda a todo el ancho de la tarjeta */}
         <div className="mb-4">
-          <div className="-mx-6 -mt-6 rounded-t-2xl bg-[#F1F5F9] border-b border-gray-200 px-6 py-3 sm:py-4 pr-20">
+          <div className="-mx-6 -mt-6 rounded-t-2xl bg-[#F1F5F9] border-b border-gray-200 px-6 py-3 sm:py-4 pr-20 h-[72px] flex flex-col justify-center">
             <h3 className="text-base sm:text-lg md:text-xl leading-tight font-bold text-[#004C4C] truncate">
               {company.name}
             </h3>
+            <p className="text-xs text-[#065C5C] font-medium mt-1 truncate min-h-[16px]">
+              {company.grupo_empresarial ? company.grupo_empresarial.nombre : ''}
+            </p>
           </div>
           <p className="mt-2 text-sm text-gray-500 pr-16">NIT: {company.tax_id}</p>
         </div>

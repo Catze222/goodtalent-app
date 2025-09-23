@@ -20,6 +20,7 @@ import { Contract, getContractStatusConfig } from '../../types/contract'
 import { formatDateColombia } from '../../utils/dateUtils'
 import { ContractStatusCompact } from '../ui/ContractStatusBadges'
 import ContractApprovalButton from '../ui/ContractApprovalButton'
+import ContractStatusBadge, { ContractPeriodBadge } from './ContractStatusBadge'
 
 interface ContractCardProps {
   contract: Contract
@@ -125,7 +126,21 @@ export default function ContractCard({
               <span>{contract.numero_contrato_helisa}</span>
             </div>
             {/* Badges de estado */}
-            <ContractStatusCompact contract={contract} />
+            <div className="flex flex-wrap items-center gap-2">
+              <ContractStatusCompact contract={contract} />
+              <ContractStatusBadge 
+                contractType={contract.tipo_contrato || 'indefinido'}
+                fechaFin={contract.fecha_fin}
+                contractStatus={contract.contract_status}
+                className="text-xs"
+              />
+              {contract.tipo_contrato === 'fijo' && contract.contract_status && (
+                <ContractPeriodBadge 
+                  contractStatus={contract.contract_status}
+                  className="text-xs"
+                />
+              )}
+            </div>
           </div>
           
           {/* Progress ring */}

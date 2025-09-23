@@ -10,6 +10,7 @@ interface Company {
   id?: string
   name: string
   tax_id: string
+  grupo_empresarial_id?: string
   accounts_contact_name?: string
   accounts_contact_email?: string
   accounts_contact_phone?: string
@@ -17,6 +18,12 @@ interface Company {
   comercial_contact_email?: string
   comercial_contact_phone?: string
   status: boolean
+}
+
+interface GrupoEmpresarial {
+  id: string
+  nombre: string
+  descripcion?: string
 }
 
 interface BusinessLine {
@@ -50,6 +57,7 @@ export default function CompanyModal({
   const [formData, setFormData] = useState<Company>({
     name: '',
     tax_id: '',
+    grupo_empresarial_id: '',
     accounts_contact_name: '',
     accounts_contact_email: '',
     accounts_contact_phone: '',
@@ -71,6 +79,12 @@ export default function CompanyModal({
   const [arlData, setARLData] = useState<{arl_id: string, fecha_inicio: string} | null>(null)
   const [cajasData, setCajasData] = useState<{ciudad_id: string, caja_id: string, fecha_inicio: string}[]>([])
   const [deletedCajasIds, setDeletedCajasIds] = useState<string[]>([])
+  
+  // Estados para grupos empresariales
+  const [gruposEmpresariales, setGruposEmpresariales] = useState<GrupoEmpresarial[]>([])
+  const [grupoEmpresarialInput, setGrupoEmpresarialInput] = useState('')
+  const [showGrupoSuggestions, setShowGrupoSuggestions] = useState(false)
+  const [loadingGrupos, setLoadingGrupos] = useState(false)
   
   // Las notificaciones visuales se manejan desde el padre con Toast
 
@@ -105,6 +119,84 @@ export default function CompanyModal({
     }
   }
 
+  // Cargar grupos empresariales disponibles
+  const loadGruposEmpresariales = async (searchTerm = '') => {
+    try {
+      setLoadingGrupos(true)
+      
+      let query = supabase
+        .from('grupos_empresariales')
+        .select('id, nombre, descripcion')
+        .order('nombre', { ascending: true })
+
+      if (searchTerm.trim()) {
+        query = query.ilike('nombre', `%${searchTerm.trim()}%`)
+      }
+
+      const { data, error } = await query.limit(10)
+
+      if (error) throw error
+      
+      setGruposEmpresariales(data || [])
+    } catch (error) {
+      console.error('Error loading grupos empresariales:', error)
+      setGruposEmpresariales([])
+    } finally {
+      setLoadingGrupos(false)
+    }
+  }
+
+  // Manejar selección de grupo empresarial
+  const handleGrupoEmpresarialSelect = (grupo: GrupoEmpresarial) => {
+    setFormData(prev => ({
+      ...prev,
+      grupo_empresarial_id: grupo.id
+    }))
+    setGrupoEmpresarialInput(grupo.nombre)
+    setShowGrupoSuggestions(false)
+  }
+
+  // Crear nuevo grupo empresarial si no existe
+  const createGrupoEmpresarial = async (nombre: string) => {
+    try {
+      const { data, error } = await supabase.rpc('get_or_create_grupo_empresarial', {
+        grupo_nombre: nombre.trim()
+      })
+
+      if (error) throw error
+
+      // Actualizar el formData con el ID del grupo (creado o existente)
+      setFormData(prev => ({
+        ...prev,
+        grupo_empresarial_id: data
+      }))
+
+      return data
+    } catch (error) {
+      console.error('Error creating grupo empresarial:', error)
+      throw error
+    }
+  }
+
+  // Cargar nombre del grupo empresarial por ID (para modo edición)
+  const loadGrupoEmpresarialName = async (grupoId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('grupos_empresariales')
+        .select('nombre')
+        .eq('id', grupoId)
+        .single()
+
+      if (error) throw error
+      
+      if (data) {
+        setGrupoEmpresarialInput(data.nombre)
+      }
+    } catch (error) {
+      console.error('Error loading grupo empresarial name:', error)
+    }
+  }
+
   // Cargar líneas de negocio asignadas a la empresa (en modo edición)
   const loadCompanyBusinessLines = async (companyId: string) => {
     try {
@@ -128,11 +220,14 @@ export default function CompanyModal({
     if (isOpen) {
       // Cargar líneas de negocio disponibles
       loadBusinessLines()
+      // Cargar grupos empresariales disponibles
+      loadGruposEmpresariales()
 
       if (mode === 'edit' && company) {
         // En modo edición, inicializar todo de una vez
         setFormData({
           ...company,
+          grupo_empresarial_id: company.grupo_empresarial_id || '',
           accounts_contact_name: company.accounts_contact_name || '',
           accounts_contact_email: company.accounts_contact_email || '',
           accounts_contact_phone: company.accounts_contact_phone || '',
@@ -142,11 +237,16 @@ export default function CompanyModal({
         })
         // Cargar líneas de negocio ya asignadas
         loadCompanyBusinessLines(company.id!)
+        // Si tiene grupo empresarial, cargar su nombre
+        if (company.grupo_empresarial_id) {
+          loadGrupoEmpresarialName(company.grupo_empresarial_id)
+        }
       } else if (mode === 'create') {
         // En modo creación, limpiar todo
         setFormData({
           name: '',
           tax_id: '',
+          grupo_empresarial_id: '',
           accounts_contact_name: '',
           accounts_contact_email: '',
           accounts_contact_phone: '',
@@ -159,13 +259,16 @@ export default function CompanyModal({
         setARLData(null)
         setCajasData([])
         setDeletedCajasIds([])
+        setGrupoEmpresarialInput('')
       }
       setErrors({})
+      setShowGrupoSuggestions(false)
     } else {
       // Al cerrar, limpiar estados para evitar parpadeos en próxima apertura
       setFormData({
         name: '',
         tax_id: '',
+        grupo_empresarial_id: '',
         accounts_contact_name: '',
         accounts_contact_email: '',
         accounts_contact_phone: '',
@@ -180,6 +283,9 @@ export default function CompanyModal({
       setARLData(null)
       setCajasData([])
       setDeletedCajasIds([])
+      setGruposEmpresariales([])
+      setGrupoEmpresarialInput('')
+      setShowGrupoSuggestions(false)
       setErrors({})
     }
   }, [isOpen, company, mode])
@@ -393,6 +499,13 @@ export default function CompanyModal({
         throw new Error('Usuario no autenticado')
       }
 
+      // Manejar grupo empresarial si se especificó
+      let grupoEmpresarialId = formData.grupo_empresarial_id || null
+      if (grupoEmpresarialInput.trim() && !grupoEmpresarialId) {
+        // Si hay texto pero no ID, crear o buscar el grupo
+        grupoEmpresarialId = await createGrupoEmpresarial(grupoEmpresarialInput)
+      }
+
       if (mode === 'create') {
         // Crear empresa y obtener el ID
         const { data: companyData, error } = await supabase
@@ -400,6 +513,7 @@ export default function CompanyModal({
           .insert([{
             name: formData.name.trim(),
             tax_id: formData.tax_id.replace(/\D/g, ''),
+            grupo_empresarial_id: grupoEmpresarialId,
             accounts_contact_name: formData.accounts_contact_name?.trim() || null,
             accounts_contact_email: formData.accounts_contact_email?.trim().toLowerCase() || null,
             accounts_contact_phone: formData.accounts_contact_phone?.trim() || null,
@@ -440,6 +554,7 @@ export default function CompanyModal({
           .update({
             name: formData.name.trim(),
             tax_id: formData.tax_id.replace(/\D/g, ''),
+            grupo_empresarial_id: grupoEmpresarialId,
             accounts_contact_name: formData.accounts_contact_name?.trim() || null,
             accounts_contact_email: formData.accounts_contact_email?.trim().toLowerCase() || null,
             accounts_contact_phone: formData.accounts_contact_phone?.trim() || null,
@@ -582,29 +697,128 @@ export default function CompanyModal({
                     )}
                   </div>
 
-                  {/* NIT y Estado en fila */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* NIT */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        NIT *
-                      </label>
+                  {/* NIT */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      NIT *
+                    </label>
+                    <input
+                      type="text"
+                      name="tax_id"
+                      value={formData.tax_id}
+                      onChange={handleInputChange}
+                      className={`w-full px-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] transition-colors text-sm ${
+                        errors.tax_id ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
+                      placeholder="900123456"
+                      required
+                    />
+                    {errors.tax_id && (
+                      <p className="mt-1 text-sm text-red-600">{errors.tax_id}</p>
+                    )}
+                  </div>
+
+                  {/* Grupo Empresarial */}
+                  <div className="relative">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Grupo Empresarial
+                    </label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <input
                         type="text"
-                        name="tax_id"
-                        value={formData.tax_id}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] transition-colors text-sm ${
-                          errors.tax_id ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                        }`}
-                        placeholder="900123456"
-                        required
+                        value={grupoEmpresarialInput}
+                        onChange={(e) => {
+                          setGrupoEmpresarialInput(e.target.value)
+                          setShowGrupoSuggestions(true)
+                          if (e.target.value.trim()) {
+                            loadGruposEmpresariales(e.target.value)
+                          } else {
+                            setFormData(prev => ({ ...prev, grupo_empresarial_id: '' }))
+                            loadGruposEmpresariales()
+                          }
+                        }}
+                        onFocus={() => {
+                          setShowGrupoSuggestions(true)
+                          if (!grupoEmpresarialInput.trim()) {
+                            loadGruposEmpresariales()
+                          }
+                        }}
+                        onBlur={() => {
+                          // Retrasar el cierre para permitir clicks en sugerencias
+                          setTimeout(() => setShowGrupoSuggestions(false), 200)
+                        }}
+                        className="w-full pl-10 pr-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-[#87E0E0] transition-colors text-sm border-gray-300"
+                        placeholder="Ej: Grupo Empresarial ABC (opcional)"
                       />
-                      {errors.tax_id && (
-                        <p className="mt-1 text-sm text-red-600">{errors.tax_id}</p>
-                      )}
                     </div>
-
+                    
+                    {/* Sugerencias de grupos empresariales */}
+                    {showGrupoSuggestions && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {loadingGrupos ? (
+                          <div className="p-3 flex items-center justify-center">
+                            <div className="w-4 h-4 border-2 border-[#87E0E0] border-t-transparent rounded-full animate-spin"></div>
+                            <span className="ml-2 text-sm text-gray-500">Buscando...</span>
+                          </div>
+                        ) : gruposEmpresariales.length > 0 ? (
+                          <>
+                            {gruposEmpresariales.map((grupo) => (
+                              <button
+                                key={grupo.id}
+                                type="button"
+                                onClick={() => handleGrupoEmpresarialSelect(grupo)}
+                                className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                              >
+                                <div className="font-medium text-sm text-gray-900">{grupo.nombre}</div>
+                                {grupo.descripcion && (
+                                  <div className="text-xs text-gray-500 mt-1">{grupo.descripcion}</div>
+                                )}
+                              </button>
+                            ))}
+                            {grupoEmpresarialInput.trim() && !gruposEmpresariales.some(g => 
+                              g.nombre.toLowerCase() === grupoEmpresarialInput.toLowerCase()
+                            ) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  createGrupoEmpresarial(grupoEmpresarialInput)
+                                  setShowGrupoSuggestions(false)
+                                }}
+                                className="w-full text-left px-4 py-3 hover:bg-blue-50 border-t border-gray-200 transition-colors"
+                              >
+                                <div className="font-medium text-sm text-blue-600">
+                                  + Crear "{grupoEmpresarialInput}"
+                                </div>
+                                <div className="text-xs text-blue-500 mt-1">
+                                  Crear nuevo grupo empresarial
+                                </div>
+                              </button>
+                            )}
+                          </>
+                        ) : grupoEmpresarialInput.trim() ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              createGrupoEmpresarial(grupoEmpresarialInput)
+                              setShowGrupoSuggestions(false)
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors"
+                          >
+                            <div className="font-medium text-sm text-blue-600">
+                              + Crear "{grupoEmpresarialInput}"
+                            </div>
+                            <div className="text-xs text-blue-500 mt-1">
+                              Crear nuevo grupo empresarial
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="p-3 text-sm text-gray-500 text-center">
+                            No hay grupos disponibles
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   </div>
                 </div>

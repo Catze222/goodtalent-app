@@ -12,6 +12,12 @@ interface Company {
   id: string
   name: string
   tax_id: string
+  grupo_empresarial_id?: string
+  grupo_empresarial?: {
+    id: string
+    nombre: string
+    descripcion?: string
+  }
   accounts_contact_name?: string
   accounts_contact_email?: string
   accounts_contact_phone?: string
@@ -103,6 +109,11 @@ export default function EmpresasPage() {
           *, 
           companies_created_by_handle, 
           companies_updated_by_handle,
+          grupo_empresarial:grupos_empresariales(
+            id,
+            nombre,
+            descripcion
+          ),
           business_lines:empresa_lineas_negocio(
             lineas_negocio(
               id,
@@ -164,6 +175,7 @@ export default function EmpresasPage() {
     const matchesSearch = searchTerm === '' || 
       company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       company.tax_id.includes(searchTerm) ||
+      (company.grupo_empresarial?.nombre && company.grupo_empresarial.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (company.accounts_contact_name && company.accounts_contact_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (company.accounts_contact_email && company.accounts_contact_email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (company.comercial_contact_name && company.comercial_contact_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -268,7 +280,7 @@ export default function EmpresasPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar por nombre, NIT, contacto o email..."
+                placeholder="Buscar por nombre, NIT, grupo empresarial, contacto o email..."
                 className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent transition-all duration-200"
               />
               {searchTerm && (

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Clock, Save, AlertCircle, ArrowLeft, Calendar, Pause, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { usePermissions } from '@/lib/usePermissions'
+import ContractHistoryTimeline from './ContractHistoryTimeline'
 
 /**
  * Modal para gestionar novedades de tiempo laboral
@@ -26,6 +27,7 @@ interface TiempoLaboralData {
   motivo: string
   // Campos específicos por tipo
   nueva_fecha_fin: string // solo prórrogas
+  tipo_prorroga: string // solo prórroga fijos: 'prorroga_automatica' | 'prorroga_acordada'
   dias: string // vacaciones/suspensiones
   programadas: boolean // solo vacaciones
   disfrutadas: boolean // solo vacaciones
@@ -84,6 +86,12 @@ export default function NovedadTiempoLaboralModal({
     tipo_contrato: null,
     numero_contrato_helisa: null
   })
+  
+  // Estado para el historial de períodos (solo para contratos fijos)
+  const [contractStatus, setContractStatus] = useState<any>(null)
+  const [loadingStatus, setLoadingStatus] = useState(false)
+  const [historicalPeriods, setHistoricalPeriods] = useState<any[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   // Estado del formulario
   const [formData, setFormData] = useState<TiempoLaboralData>({
@@ -92,6 +100,7 @@ export default function NovedadTiempoLaboralModal({
     fecha_fin: '',
     motivo: '',
     nueva_fecha_fin: '',
+    tipo_prorroga: 'prorroga_automatica',
     dias: '',
     programadas: false,
     disfrutadas: false
@@ -117,6 +126,11 @@ export default function NovedadTiempoLaboralModal({
             tipo_contrato: contract.tipo_contrato,
             numero_contrato_helisa: contract.numero_contrato_helisa
           })
+
+          // Si es contrato fijo, cargar el estado de períodos
+          if (contract.tipo_contrato === 'fijo') {
+            loadContractFixedStatus()
+          }
         }
       } catch (error) {
         console.error('Error loading contract info:', error)
@@ -125,6 +139,40 @@ export default function NovedadTiempoLaboralModal({
 
     loadContractInfo()
   }, [isOpen, contractId])
+
+  // Cargar estado de períodos para contratos fijos
+  const loadContractFixedStatus = async () => {
+    if (!contractId) return
+
+    try {
+      setLoadingStatus(true)
+      setLoadingHistory(true)
+
+      // Cargar estado del contrato
+      const { data: statusData, error: statusError } = await supabase.rpc('get_contract_fixed_status', {
+        contract_uuid: contractId
+      })
+
+      if (statusError) throw statusError
+      setContractStatus(statusData)
+
+      // Cargar historial de períodos
+      const { data: periodsData, error: periodsError } = await supabase
+        .from('historial_contratos_fijos')
+        .select('*')
+        .eq('contract_id', contractId)
+        .order('numero_periodo', { ascending: true })
+
+      if (periodsError) throw periodsError
+      setHistoricalPeriods(periodsData || [])
+
+    } catch (error) {
+      console.error('Error loading contract fixed data:', error)
+    } finally {
+      setLoadingStatus(false)
+      setLoadingHistory(false)
+    }
+  }
 
   // Reset cuando se cierra el modal
   useEffect(() => {
@@ -138,7 +186,8 @@ export default function NovedadTiempoLaboralModal({
         nueva_fecha_fin: '',
         dias: '',
         programadas: false,
-        disfrutadas: false
+        disfrutadas: false,
+        tipo_prorroga: 'prorroga_automatica'
       })
       setError('')
     }
@@ -174,22 +223,6 @@ export default function NovedadTiempoLaboralModal({
     return canExtend
   }
 
-  // Calcular duración actual del contrato
-  const calculateContractDuration = () => {
-    if (!contractInfo.fecha_inicio || !contractInfo.fecha_fin) return { months: 0, days: 0 }
-    
-    const inicio = new Date(contractInfo.fecha_inicio)
-    const fin = new Date(contractInfo.fecha_fin)
-    
-    const years = fin.getFullYear() - inicio.getFullYear()
-    const months = fin.getMonth() - inicio.getMonth()
-    const totalMonths = years * 12 + months
-    
-    const diffTime = fin.getTime() - inicio.getTime()
-    const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    return { months: totalMonths, days: totalDays }
-  }
 
   // Calcular duración de la prórroga
   const calculateExtensionDuration = () => {
@@ -236,6 +269,35 @@ export default function NovedadTiempoLaboralModal({
         setError('La nueva fecha debe ser posterior a la fecha actual de finalización')
         return
       }
+
+      // Validaciones especiales para contratos fijos
+      if (contractInfo.tipo_contrato === 'fijo' && contractStatus) {
+        // Validación prórroga 5ta o mayor = mínimo 1 año
+        const numeroProrrogaSiguiente = contractStatus.proximo_periodo - 1 // El inicial no cuenta
+        
+        if (numeroProrrogaSiguiente >= 5) {
+          const currentEndDate = new Date(contractInfo.fecha_fin || '') // Fecha fin actual del contrato
+          const extensionEnd = new Date(formData.nueva_fecha_fin)
+          const extensionDays = Math.ceil((extensionEnd.getTime() - currentEndDate.getTime()) / (1000 * 60 * 60 * 24))
+          
+          if (extensionDays < 365) {
+            setError(`La prórroga #${numeroProrrogaSiguiente} debe ser mínimo de 1 año (365 días). Actualmente son ${extensionDays} días.`)
+            return
+          }
+        }
+
+        // Validación no exceder 4 años
+        const currentEndDate = new Date(contractInfo.fecha_fin || '') // Fecha fin actual del contrato
+        const extensionEnd = new Date(formData.nueva_fecha_fin)
+        const extensionDays = Math.ceil((extensionEnd.getTime() - currentEndDate.getTime()) / (1000 * 60 * 60 * 24))
+        const extensionYears = extensionDays / 365
+        const totalYearsWithExtension = contractStatus.años_totales + extensionYears
+        
+        if (totalYearsWithExtension > 4) {
+          setError(`No se puede prorrogar. Esta prórroga resultaría en ${totalYearsWithExtension.toFixed(1)} años totales. Después de 4 años debe ser contrato indefinido.`)
+          return
+        }
+      }
     }
 
     if (selectedType.id === 'vacaciones' || selectedType.id === 'suspension') {
@@ -257,37 +319,62 @@ export default function NovedadTiempoLaboralModal({
     setLoading(true)
 
     try {
-      // Preparar datos para insertar
-      const dataToInsert: any = {
-        contract_id: contractId,
-        tipo_tiempo: formData.tipo_tiempo,
-        fecha_inicio: formData.fecha_inicio,
-        fecha_fin: formData.fecha_fin || null,
-        motivo: formData.motivo.trim(),
-        created_by: user?.id
-      }
+      if (selectedType.id === 'prorroga' && contractInfo.tipo_contrato === 'fijo') {
+        // Para contratos fijos, usar la nueva función de prórroga
+        const { error: prorrogaError } = await supabase.rpc('extend_contract_period', {
+          contract_uuid: contractId,
+          p_nueva_fecha_fin: formData.nueva_fecha_fin,
+          p_tipo_periodo: formData.tipo_prorroga,
+          p_motivo: formData.motivo.trim(), // Esto va a observaciones en el historial
+          user_id: user?.id
+        })
 
-      // Agregar campos específicos por tipo
-      if (selectedType.id === 'prorroga') {
-        dataToInsert.nueva_fecha_fin = formData.nueva_fecha_fin
-      }
+        if (prorrogaError) {
+          throw prorrogaError
+        }
 
-      if (selectedType.id === 'vacaciones' || selectedType.id === 'suspension') {
-        const diasCalculados = calculateDias()
-        dataToInsert.dias = diasCalculados
-      }
+        // También actualizar el contrato principal
+        const { error: updateError } = await supabase
+          .from('contracts')
+          .update({ fecha_fin: formData.nueva_fecha_fin })
+          .eq('id', contractId)
 
-      if (selectedType.id === 'vacaciones') {
-        dataToInsert.programadas = formData.programadas
-        dataToInsert.disfrutadas = formData.disfrutadas
-      }
+        if (updateError) {
+          throw updateError
+        }
+      } else {
+        // Para otros tipos de novedad o contratos indefinidos, usar el método anterior
+        const dataToInsert: any = {
+          contract_id: contractId,
+          tipo_tiempo: formData.tipo_tiempo,
+          fecha_inicio: formData.fecha_inicio,
+          fecha_fin: formData.fecha_fin || null,
+          motivo: formData.motivo.trim(),
+          created_by: user?.id
+        }
 
-      const { error: insertError } = await supabase
-        .from('novedades_tiempo_laboral')
-        .insert(dataToInsert)
+        // Agregar campos específicos por tipo
+        if (selectedType.id === 'prorroga') {
+          dataToInsert.nueva_fecha_fin = formData.nueva_fecha_fin
+        }
 
-      if (insertError) {
-        throw insertError
+        if (selectedType.id === 'vacaciones' || selectedType.id === 'suspension') {
+          const diasCalculados = calculateDias()
+          dataToInsert.dias = diasCalculados
+        }
+
+        if (selectedType.id === 'vacaciones') {
+          dataToInsert.programadas = formData.programadas
+          dataToInsert.disfrutadas = formData.disfrutadas
+        }
+
+        const { error: insertError } = await supabase
+          .from('novedades_tiempo_laboral')
+          .insert(dataToInsert)
+
+        if (insertError) {
+          throw insertError
+        }
       }
 
       // Éxito
@@ -411,104 +498,89 @@ export default function NovedadTiempoLaboralModal({
           ) : (
             // Formulario específico
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Tipo seleccionado */}
-              <div className={`p-4 rounded-lg ${selectedType.bgColor} ${selectedType.borderColor} border`}>
-                <div className="flex items-center space-x-3">
-                  <selectedType.icon className={`h-5 w-5 ${selectedType.color}`} />
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{selectedType.label}</h3>
-                    <p className="text-sm text-gray-600">{selectedType.description}</p>
-                  </div>
-                </div>
-              </div>
 
-              {/* Información del contrato */}
-              {contractInfo.fecha_inicio && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 lg:p-6 rounded-xl border border-blue-200">
-                  <h4 className="font-semibold text-blue-900 mb-4 flex items-center space-x-2">
-                    <span>📋</span>
-                    <span>Información del Contrato Actual</span>
-                  </h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                    {/* Número de contrato */}
-                    {contractInfo.numero_contrato_helisa && (
-                      <div className="bg-white p-3 rounded-lg border border-blue-100">
-                        <span className="text-gray-500 text-xs font-medium block">Número:</span>
-                        <span className="text-blue-900 font-semibold">{contractInfo.numero_contrato_helisa}</span>
-                      </div>
-                    )}
+
+              {/* Alertas Simples - Solo para contratos fijos */}
+              {selectedType.id === 'prorroga' && contractInfo.tipo_contrato === 'fijo' && contractStatus && (
+                <div className="space-y-3">
+                  {/* Alerta: Prórroga 5ta o mayor = mínimo 1 año */}
+                  {(() => {
+                    // Calcular número de prórroga (próximo período - 1, porque el inicial no cuenta)
+                    const numeroProrrogaSiguiente = contractStatus.proximo_periodo - 1
                     
-                    {/* Tipo de contrato */}
-                    <div className="bg-white p-3 rounded-lg border border-blue-100">
-                      <span className="text-gray-500 text-xs font-medium block">Tipo:</span>
-                      <span className={`font-semibold ${
-                        contractInfo.tipo_contrato === 'fijo' ? 'text-green-700' : 'text-orange-700'
-                      }`}>
-                        {contractInfo.tipo_contrato}
-                      </span>
+                    if (numeroProrrogaSiguiente >= 5) {
+                      return (
+                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                          <div className="flex items-start space-x-3">
+                            <span className="text-orange-600 text-xl">⚠️</span>
+                            <div>
+                              <h4 className="font-semibold text-orange-900">
+                                Prórroga #{numeroProrrogaSiguiente} - Mínimo 1 Año
+                              </h4>
+                              <p className="text-sm text-orange-800">
+                                Esta será la {numeroProrrogaSiguiente}ª prórroga. Por ley colombiana, debe ser mínimo de 1 año (365 días).
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+
+                  {/* Alerta: Excede 4 años = no se puede prorrogar */}
+                  {(() => {
+                    if (!formData.nueva_fecha_fin || !contractStatus.años_totales || !contractInfo.fecha_fin) return null
+                    
+                    // Calcular años totales con la nueva prórroga
+                    const currentEndDate = new Date(contractInfo.fecha_fin) // Fecha fin actual del contrato
+                    const extensionEnd = new Date(formData.nueva_fecha_fin)
+                    const extensionDays = Math.ceil((extensionEnd.getTime() - currentEndDate.getTime()) / (1000 * 60 * 60 * 24))
+                    const extensionYears = extensionDays / 365
+                    const totalYearsWithExtension = contractStatus.años_totales + extensionYears
+                    
+                    if (totalYearsWithExtension > 4) {
+                      return (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <div className="flex items-start space-x-3">
+                            <span className="text-red-600 text-xl">🚨</span>
+                            <div>
+                              <h4 className="font-semibold text-red-900">No Se Puede Prorrogar</h4>
+                              <p className="text-sm text-red-800">
+                                Esta prórroga resultaría en {totalYearsWithExtension.toFixed(1)} años totales. 
+                                Por ley colombiana, después de 4 años debe ser contrato indefinido.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  })()}
+                </div>
+              )}
+
+              {/* Historial Completo de Períodos - Solo para contratos fijos */}
+              {selectedType.id === 'prorroga' && contractInfo.tipo_contrato === 'fijo' && (
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  {loadingHistory ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <span className="ml-3 text-gray-600">Cargando historial completo...</span>
                     </div>
-                    
-                    {/* Fecha inicio */}
-                    <div className="bg-white p-3 rounded-lg border border-blue-100">
-                      <span className="text-gray-500 text-xs font-medium block">Fecha Inicio:</span>
-                      <span className="text-blue-900 font-semibold">{contractInfo.fecha_inicio}</span>
-                    </div>
-                    
-                    {/* Fecha fin */}
-                    <div className="bg-white p-3 rounded-lg border border-blue-100">
-                      <span className="text-gray-500 text-xs font-medium block">Fecha Fin:</span>
-                      <span className={`font-semibold ${contractInfo.fecha_fin ? 'text-blue-900' : 'text-gray-500'}`}>
-                        {contractInfo.fecha_fin || 'Indefinido'}
-                      </span>
-                    </div>
-                    
-                    {/* Duración actual */}
-                    {contractInfo.fecha_fin && (
-                      <div className="bg-white p-3 rounded-lg border border-blue-100">
-                        <span className="text-gray-500 text-xs font-medium block">Duración Actual:</span>
-                        <span className="text-blue-900 font-semibold">
-                          {(() => {
-                            const duration = calculateContractDuration()
-                            return duration.months > 0 
-                              ? `${duration.months} ${duration.months === 1 ? 'mes' : 'meses'}`
-                              : `${duration.days} días`
-                          })()}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {/* Días restantes */}
-                    {contractInfo.fecha_fin && (
-                      <div className="bg-white p-3 rounded-lg border border-blue-100">
-                        <span className="text-gray-500 text-xs font-medium block">Días Restantes:</span>
-                        <span className={`font-semibold ${
-                          (() => {
-                            const today = new Date()
-                            const endDate = new Date(contractInfo.fecha_fin)
-                            const diffTime = endDate.getTime() - today.getTime()
-                            const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-                            return daysLeft <= 30 ? 'text-red-600' : daysLeft <= 90 ? 'text-orange-600' : 'text-green-600'
-                          })()
-                        }`}>
-                          {(() => {
-                            const today = new Date()
-                            const endDate = new Date(contractInfo.fecha_fin)
-                            const diffTime = endDate.getTime() - today.getTime()
-                            const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-                            return daysLeft > 0 ? `${daysLeft} días` : 'Vencido'
-                          })()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <ContractHistoryTimeline
+                      periods={historicalPeriods}
+                      contractStatus={contractStatus}
+                    />
+                  )}
                 </div>
               )}
 
               {/* Campos específicos por tipo */}
               {selectedType.id === 'prorroga' && (
                 <div className="space-y-6">
-                  {/* Nueva fecha de finalización */}
+                  {/* Fechas de la prórroga */}
                   <div className="bg-white p-4 lg:p-6 rounded-xl border border-gray-200">
                     <h5 className="font-semibold text-gray-900 mb-4 flex items-center space-x-2">
                       <span>🔄</span>
@@ -516,23 +588,58 @@ export default function NovedadTiempoLaboralModal({
                     </h5>
                     
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Nueva Fecha de Finalización *
-                        </label>
-                        <input
-                          type="date"
-                          value={formData.nueva_fecha_fin}
-                          onChange={(e) => handleInputChange('nueva_fecha_fin', e.target.value)}
-                          min={contractInfo.fecha_fin || undefined}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          required
-                        />
-                        {contractInfo.fecha_fin && (
+                      {/* Fechas de la prórroga */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Fecha de inicio (calculada automáticamente) */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Fecha de Inicio de la Prórroga
+                          </label>
+                          <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+                            {contractInfo.fecha_fin ? (
+                              (() => {
+                                const fechaFin = new Date(contractInfo.fecha_fin)
+                                fechaFin.setDate(fechaFin.getDate() + 1)
+                                return fechaFin.toISOString().split('T')[0]
+                              })()
+                            ) : 'N/A'}
+                          </div>
                           <p className="text-xs text-gray-500 mt-1">
-                            Debe ser posterior a: <strong>{contractInfo.fecha_fin}</strong>
+                            <strong>Automático:</strong> Un día después del fin actual ({contractInfo.fecha_fin})
                           </p>
-                        )}
+                        </div>
+
+                        {/* Fecha de fin */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Fecha de Finalización de la Prórroga *
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.nueva_fecha_fin}
+                            onChange={(e) => handleInputChange('nueva_fecha_fin', e.target.value)}
+                            min={contractInfo.fecha_fin ? (
+                              (() => {
+                                const fechaFin = new Date(contractInfo.fecha_fin)
+                                fechaFin.setDate(fechaFin.getDate() + 1)
+                                return fechaFin.toISOString().split('T')[0]
+                              })()
+                            ) : undefined}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            required
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Debe ser posterior a: <strong>
+                              {contractInfo.fecha_fin ? (
+                                (() => {
+                                  const fechaFin = new Date(contractInfo.fecha_fin)
+                                  fechaFin.setDate(fechaFin.getDate() + 1)
+                                  return fechaFin.toISOString().split('T')[0]
+                                })()
+                              ) : 'N/A'}
+                            </strong>
+                          </p>
+                        </div>
                       </div>
 
                       {/* Cálculo de duración de la prórroga */}
@@ -717,21 +824,52 @@ export default function NovedadTiempoLaboralModal({
                 </div>
               )}
 
+              {/* Tipo de Prórroga - Solo para contratos fijos */}
+              {selectedType.id === 'prorroga' && contractInfo.tipo_contrato === 'fijo' && (
+                <div className="bg-white p-4 lg:p-6 rounded-xl border border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Tipo de Prórroga *
+                  </label>
+                  <select
+                    value={formData.tipo_prorroga}
+                    onChange={(e) => handleInputChange('tipo_prorroga', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  >
+                    <option value="prorroga_automatica">Prórroga Automática</option>
+                    <option value="prorroga_acordada">Prórroga Acordada</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    <strong>Automática:</strong> Por ley o reglamento. <strong>Acordada:</strong> Por mutuo acuerdo entre las partes.
+                  </p>
+                </div>
+              )}
+
               {/* Motivo */}
               <div className="bg-white p-4 lg:p-6 rounded-xl border border-gray-200">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Motivo de la {selectedType.label} *
+                  {selectedType.id === 'prorroga' && contractInfo.tipo_contrato === 'fijo' 
+                    ? 'Observaciones de la Prórroga *'
+                    : `Motivo de la ${selectedType.label} *`
+                  }
                 </label>
                 <textarea
                   value={formData.motivo}
                   onChange={(e) => handleInputChange('motivo', e.target.value)}
-                  placeholder={`Describe la razón de la ${selectedType.label.toLowerCase()}...`}
+                  placeholder={
+                    selectedType.id === 'prorroga' && contractInfo.tipo_contrato === 'fijo'
+                      ? 'Observaciones adicionales sobre la prórroga...'
+                      : `Describe la razón de la ${selectedType.label.toLowerCase()}...`
+                  }
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                   required
                 />
                 <p className="text-xs text-gray-500 mt-2">
-                  Proporciona una explicación clara y detallada del motivo
+                  {selectedType.id === 'prorroga' && contractInfo.tipo_contrato === 'fijo'
+                    ? 'Información adicional sobre la prórroga (guardado en observaciones del historial)'
+                    : 'Proporciona una explicación clara y detallada del motivo'
+                  }
                 </p>
               </div>
 

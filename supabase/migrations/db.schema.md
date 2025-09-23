@@ -1,10 +1,10 @@
 # 📊 Schema de Base de Datos - GOOD Talent
-## Estado: CONSOLIDADO v3.0 - MIGRACIÓN UNIFICADA COMPLETA
-*Última actualización: 2025-01-15*
+## Estado: CONSOLIDADO v4.2 - SISTEMA COMPLETO CON PERÍODOS DE CONTRATOS FIJOS
+*Última actualización: 2025-01-22*
 
-> **🚀 NUEVA MIGRACIÓN CONSOLIDADA:** Se ha creado una migración unificada que incluye todo el sistema.
-> **Archivos:** `00000000000000_initial_complete_schema.sql` + 3 archivos de continuación
-> **Contenido:** Permisos + Empresas + Contratos + Tablas Auxiliares + Líneas de Negocio + Datos Iniciales
+> **🚀 SISTEMA COMPLETO:** Schema consolidado con sistema de novedades laborales implementado.
+> **Archivos:** 18 migraciones que incluyen sistema base + novedades + optimizaciones
+> **Contenido:** Permisos + Empresas + Contratos + Tablas Auxiliares + Líneas de Negocio + Sistema Completo de Novedades + Funciones Helper
 
 ## 🎯 Tablas del Sistema de Permisos
 
@@ -160,6 +160,7 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 | `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440000` |
 | `name` | TEXT | Nombre de la empresa cliente | `Good Temporal` |
 | `tax_id` | TEXT | NIT o identificación tributaria | `900123456` |
+| `grupo_empresarial_id` | UUID (FK) | Grupo empresarial al que pertenece (opcional) | `grupo-uuid` |
 | `accounts_contact_name` | TEXT | Nombre del contacto de cuentas por cobrar | `María Pérez` |
 | `accounts_contact_email` | TEXT | Email del contacto de cuentas por cobrar | `mperez@good.com` |
 | `accounts_contact_phone` | TEXT | Teléfono del contacto de cuentas por cobrar | `+57 300 123 4567` |
@@ -172,6 +173,7 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 | `archived_by` | UUID (FK) | Usuario que archivó el registro | `NULL` |
 
 **Relaciones:**
+- `grupo_empresarial_id` → `grupos_empresariales(id)`
 - `created_by` → `auth.users(id)`
 - `updated_by` → `auth.users(id)` 
 - `archived_by` → `auth.users(id)`
@@ -196,6 +198,50 @@ SELECT has_permission('usuario-123', 'companies', 'view');
 
 **Triggers:**
 - `trigger_companies_updated_at` - Actualiza automáticamente `updated_at` y `updated_by`
+
+---
+
+## 🏢 Tabla de Grupos Empresariales
+
+### 3.1. `grupos_empresariales` – Grupos Empresariales
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único | `550e8400-e29b-41d4-a716-446655440001` |
+| `nombre` | TEXT | Nombre único del grupo empresarial | `Grupo Empresarial ABC` |
+| `descripcion` | TEXT | Descripción opcional del grupo | `Holding de empresas del sector financiero` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación del registro | `2025-01-22 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+| `updated_at` | TIMESTAMPTZ | Fecha de última edición | `2025-01-22 14:30:00` |
+| `updated_by` | UUID (FK) | Usuario que realizó la última edición | `user-uuid` |
+
+**Relaciones:**
+- `created_by` → `auth.users(id)`
+- `updated_by` → `auth.users(id)`
+
+**Restricciones:**
+- `UNIQUE(nombre)` - Nombre único por grupo empresarial
+- Validación de nombre no vacío
+
+**Índices:**
+- `idx_grupos_empresariales_nombre` - Búsqueda por nombre
+- `idx_grupos_empresariales_created_at` - Filtro por fecha de creación
+
+**Seguridad RLS:**
+- **Ver:** Usuarios con permiso `companies.view`
+- **Crear:** Usuarios con permiso `companies.create`
+- **Editar:** Usuarios con permiso `companies.edit`
+- **Eliminar:** Usuarios con permiso `companies.delete`
+
+**Triggers:**
+- `trigger_grupos_empresariales_updated_at` - Actualiza automáticamente `updated_at` y `updated_by`
+
+**Funciones Helper:**
+- `get_or_create_grupo_empresarial(nombre)` - Obtiene o crea un grupo empresarial
+- `get_empresas_por_grupo(grupo_id)` - Obtiene empresas de un grupo
+- `get_grupos_empresariales_with_count()` - Lista grupos con conteo de empresas
+
+**Propósito:** Permite agrupar empresas relacionadas bajo un mismo grupo empresarial para mejor organización y gestión.
 
 ---
 
@@ -774,4 +820,135 @@ SELECT * FROM get_parametro_anual('auxilio_transporte');
 
 ---
 
-*Sistema consolidado GOOD Talent v3.0 - Migración Unificada Completa*
+## 👤 Sistema de Perfiles de Usuario con Alias
+
+### 14. `user_profiles` – Perfiles de Usuario con Alias
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `user_id` | UUID (PK) | Usuario de auth.users | `user-uuid` |
+| `alias` | TEXT | Alias único para login | `jcanal`, `mperez` |
+| `notification_email` | TEXT | Email real para notificaciones | `comercial@grupogood.co` |
+| `display_name` | TEXT | Nombre para mostrar | `Juan Canal` |
+| `is_temp_password` | BOOLEAN | Si tiene contraseña temporal | `true` |
+| `temp_password_expires_at` | TIMESTAMPTZ | Cuándo expira la contraseña temporal | `2025-01-29 10:00:00` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-22 10:00:00` |
+| `updated_at` | TIMESTAMPTZ | Fecha de actualización | `2025-01-22 14:30:00` |
+| `created_by` | UUID (FK) | Usuario que creó el perfil | `admin-uuid` |
+| `updated_by` | UUID (FK) | Usuario que actualizó el perfil | `admin-uuid` |
+
+**Relaciones:**
+- `user_id` → `auth.users(id)` ON DELETE CASCADE
+- `created_by` → `auth.users(id)`
+- `updated_by` → `auth.users(id)`
+
+**Restricciones:**
+- `UNIQUE(alias)` - Alias único por usuario
+- Validación de email en `notification_email`
+- Validación de formato de alias (solo letras, números, puntos, guiones)
+
+**Propósito:** Permite login con alias en lugar de email, múltiples usuarios pueden compartir el mismo email de notificaciones.
+
+### Funciones Helper - Perfiles de Usuario
+
+- `get_user_id_by_alias(alias)` - Obtiene UUID por alias
+- `get_alias_by_user_id(user_id)` - Obtiene alias por UUID
+- `get_user_profile_by_alias(alias)` - Obtiene perfil completo por alias
+- `get_all_user_profiles()` - Lista todos los perfiles con información de auth
+- `mark_password_as_permanent(user_id)` - Marca contraseña como permanente
+- `generate_internal_email(alias)` - Genera email interno único
+
+### Sistema de Contraseñas Temporales
+
+**Flujo:**
+1. Admin crea usuario con alias + contraseña temporal
+2. Usuario se loguea con alias + contraseña temporal
+3. Sistema detecta `is_temp_password = true`
+4. Fuerza cambio de contraseña antes de acceder
+5. Marca `is_temp_password = false` al cambiar
+
+**RLS:**
+- **Ver:** Usuarios con permisos de gestión o propio perfil
+- **Crear:** Usuarios con permisos de gestión
+- **Editar:** Usuarios con permisos de gestión o propio perfil
+- **Eliminar:** Solo super admins
+
+---
+
+---
+
+## 🕒 Sistema de Períodos de Contratos Fijos
+
+### 15. `historial_contratos_fijos` – Períodos de Contratos a Término Fijo
+
+**Propósito:** Gestión completa del historial de períodos de contratos fijos, incluyendo períodos históricos y prórrogas.
+
+| Columna | Tipo | Descripción | Ejemplo |
+|---------|------|-------------|---------|
+| `id` | UUID (PK) | Identificador único del período | `period-uuid-123` |
+| `contract_id` | UUID (FK) | ID del contrato | `contract-uuid-456` |
+| `numero_periodo` | INTEGER | Número secuencial del período | `1`, `2`, `3` |
+| `fecha_inicio` | DATE | Fecha de inicio del período | `2024-01-01` |
+| `fecha_fin` | DATE | Fecha de fin del período | `2024-12-31` |
+| `tipo_periodo` | TEXT | Tipo de período | `inicial`, `prorroga_automatica`, `prorroga_acordada` |
+| `es_periodo_actual` | BOOLEAN | Si es el período activo actual | `true`, `false` |
+| `soporte_url` | TEXT | URL de documentos de soporte | `https://drive.google.com/...` |
+| `observaciones` | TEXT | Observaciones del período | `Prórroga por necesidades del servicio` |
+| `created_at` | TIMESTAMPTZ | Fecha de creación | `2025-01-22 10:00:00` |
+| `created_by` | UUID (FK) | Usuario que creó el registro | `user-uuid` |
+
+**Relaciones:**
+- `contract_id` → `contracts(id)` (CASCADE DELETE)
+- `created_by` → `auth.users(id)`
+
+**Restricciones:**
+- `numero_periodo > 0` - Número de período debe ser positivo
+- `tipo_periodo IN ('inicial', 'prorroga_automatica', 'prorroga_acordada')` - Tipos válidos
+- `fecha_inicio < fecha_fin` - Fechas válidas
+- `UNIQUE(contract_id, numero_periodo)` - No duplicar números de período por contrato
+- `UNIQUE(contract_id, es_periodo_actual)` - Solo un período actual por contrato (cuando es_periodo_actual = true)
+
+**Índices:**
+- `idx_historial_contratos_contract_periodo` - Búsqueda por contrato y período
+- `idx_historial_contratos_fechas` - Búsqueda por fechas
+- `idx_historial_contratos_periodo_actual` - Períodos actuales
+- `idx_unique_periodo_actual` - Único período actual por contrato
+
+**Funciones SQL Helper:**
+
+#### `get_contract_fixed_status(contract_uuid UUID) → JSONB`
+Obtiene el estado completo del historial de un contrato fijo.
+
+**Retorna:**
+```json
+{
+  "total_periodos": 3,
+  "periodo_actual": 3,
+  "dias_totales": 1095,
+  "años_totales": 3.0,
+  "proximo_periodo": 4,
+  "debe_ser_indefinido": false,
+  "alerta_legal": "ALERTA - Próximo período debe ser indefinido"
+}
+```
+
+#### `create_contract_period(contract_uuid, fecha_inicio, fecha_fin, tipo_periodo, es_actual, user_id) → UUID`
+Crea un nuevo período en el historial del contrato.
+
+#### `extend_contract_period(contract_uuid, nueva_fecha_fin, tipo_periodo, motivo, user_id) → JSONB`
+Extiende un contrato fijo con una nueva prórroga.
+
+**Seguridad RLS:**
+- **Ver:** Usuarios con permiso `contracts.view`
+- **Crear:** Usuarios con permiso `contracts.create` 
+- **Editar:** Usuarios con permiso `contracts.edit`
+- **Eliminar:** Usuarios con permiso `contracts.delete`
+
+**Triggers:**
+- Validación automática de fechas y períodos
+- Mantenimiento de integridad referencial
+- Auditoría de cambios
+
+---
+
+*Sistema consolidado GOOD Talent v4.2 - Con Sistema de Períodos de Contratos Fijos + Alias de Usuario + Grupos Empresariales*

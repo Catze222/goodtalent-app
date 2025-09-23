@@ -20,6 +20,7 @@ import {
  */
 export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [userProfile, setUserProfile] = useState<{alias: string, display_name?: string, notification_email: string} | null>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const { user, canManageUsers, canManageAuxTables, logout } = usePermissions()
@@ -40,6 +41,29 @@ export default function Header() {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showUserMenu])
+
+  // Cargar perfil del usuario
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!user?.id) return
+      
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('alias, display_name, notification_email')
+          .eq('user_id', user.id)
+          .single()
+        
+        if (profile) {
+          setUserProfile(profile)
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error)
+      }
+    }
+
+    loadUserProfile()
+  }, [user?.id])
 
   const handleLogout = async () => {
     try {
@@ -105,16 +129,22 @@ export default function Header() {
             >
               {/* Avatar */}
               <div className="w-8 h-8 bg-gradient-to-br from-[#87E0E0] to-[#5FD3D2] rounded-full flex items-center justify-center">
-                <UserIcon className="h-4 w-4 text-[#004C4C]" />
+                {userProfile?.alias ? (
+                  <span className="text-[#004C4C] font-semibold text-sm">
+                    {userProfile.alias.charAt(0).toUpperCase()}
+                  </span>
+                ) : (
+                  <UserIcon className="h-4 w-4 text-[#004C4C]" />
+                )}
               </div>
               
               {/* User Info */}
               <div className="hidden lg:block text-left">
                 <p className="text-sm font-semibold text-gray-900">
-                  {user?.email?.split('@')[0] || 'Usuario'}
+                  {userProfile?.alias || user?.email?.split('@')[0] || 'Usuario'}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {user?.email || 'Usuario'}
+                  {userProfile?.display_name || userProfile?.notification_email || user?.email || 'Usuario'}
                 </p>
               </div>
               
@@ -126,10 +156,10 @@ export default function Header() {
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
                 <div className="px-4 py-3 border-b border-gray-100">
                   <p className="text-sm font-semibold text-gray-900">
-                    {user?.email?.split('@')[0] || 'Usuario'}
+                    {userProfile?.alias || user?.email?.split('@')[0] || 'Usuario'}
                   </p>
                   <p className="text-xs text-gray-500 truncate">
-                    {user?.email || 'Usuario'}
+                    {userProfile?.display_name || userProfile?.notification_email || user?.email || 'Usuario'}
                   </p>
                 </div>
                 

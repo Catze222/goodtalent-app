@@ -8,6 +8,7 @@ import OCRButton from '../ocr/OCRButton'
 import ContractModalOnboarding from './ContractModalOnboarding'
 import CompanySelector from '../ui/CompanySelector'
 import CitySelector from '../ui/CitySelector'
+import ContractHistorialModal from './ContractHistorialModal'
 
 
 
@@ -117,6 +118,11 @@ export default function ContractModal({
 
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  
+  // Estados para modal de historial de períodos
+  const [showHistorialModal, setShowHistorialModal] = useState(false)
+  const [periodosHistorial, setPeriodosHistorial] = useState<any[]>([])
+  const [contractFixedStatus, setContractFixedStatus] = useState<any>(null)
 
   // Cargar parámetros anuales para cálculos
   const loadParametrosAnuales = async (year: number) => {
@@ -457,6 +463,60 @@ export default function ContractModal({
   }, [isOpen])
 
   // Resetear formulario cuando se abre/cierra el modal
+  // Función para cargar historial de períodos existente
+  const loadContractHistorial = async (contractId: string) => {
+    try {
+      // Primero verificar si es contrato fijo
+      if (contract?.tipo_contrato !== 'fijo') {
+        return
+      }
+
+      // Cargar períodos históricos (no actuales)
+      const { data: periodosData, error } = await supabase
+        .from('historial_contratos_fijos')
+        .select('*')
+        .eq('contract_id', contractId)
+        .eq('es_periodo_actual', false)
+        .order('numero_periodo', { ascending: true })
+
+      if (error) {
+        console.error('Error cargando historial de períodos:', error)
+        return
+      }
+
+      if (periodosData && periodosData.length > 0) {
+        // Convertir a formato del modal de historial
+        const periodosFormateados = periodosData.map(p => ({
+          id: p.id,
+          numero_periodo: p.numero_periodo,
+          fecha_inicio: p.fecha_inicio,
+          fecha_fin: p.fecha_fin,
+          tipo_periodo: p.tipo_periodo,
+          observaciones: p.observaciones || ''
+        }))
+
+        setPeriodosHistorial(periodosFormateados)
+
+        // Calcular el estado del contrato
+        const { data: statusData } = await supabase.rpc('get_contract_fixed_status', {
+          contract_uuid: contractId
+        })
+
+        if (statusData) {
+          setContractFixedStatus({
+            totalPeriodos: statusData.total_periodos,
+            diasTotales: statusData.dias_totales,
+            añosTotales: statusData.años_totales,
+            proximoPeriodo: statusData.proximo_periodo,
+            debeSerIndefinido: statusData.debe_ser_indefinido
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error loading contract historial:', error)
+    }
+  }
+
   useEffect(() => {
     if (isOpen) {
       if (mode === 'edit' && contract) {
@@ -520,6 +580,11 @@ export default function ContractModal({
           radicado_ccf: contract.radicado_ccf || '',
           observacion: contract.observacion || ''
         })
+
+        // Cargar historial de períodos si es contrato fijo
+        if (contract.tipo_contrato === 'fijo' && contract.id) {
+          loadContractHistorial(contract.id)
+        }
       } else {
         // Reset para crear nuevo
         setFormData({
@@ -572,6 +637,10 @@ export default function ContractModal({
       }
       setCurrentTab(0)
       setErrors({})
+      
+      // Limpiar historial de períodos
+      setPeriodosHistorial([])
+      setContractFixedStatus(null)
     }
   }, [isOpen, contract, mode, companies])
 
@@ -864,6 +933,64 @@ export default function ContractModal({
     }
   }
 
+  // Función para guardar el historial de períodos Y el período actual
+  const guardarHistorialPeriodos = async (contractId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Usuario no autenticado')
+
+      console.log('🔄 Guardando historial de períodos:', periodosHistorial.length, 'períodos')
+
+      // 1. Crear períodos de historial (PASADOS/TERMINADOS)
+      for (let i = 0; i < periodosHistorial.length; i++) {
+        const periodo = periodosHistorial[i]
+        console.log(`📝 Guardando período histórico #${i + 1}:`, periodo)
+        
+        const { data, error } = await supabase.rpc('create_contract_period', {
+          contract_uuid: contractId,
+          p_fecha_inicio: periodo.fecha_inicio,
+          p_fecha_fin: periodo.fecha_fin,
+          p_tipo_periodo: periodo.tipo_periodo,
+          p_es_actual: false, // Los históricos SIEMPRE son false
+          user_id: user.id
+        })
+
+        if (error) {
+          console.error(`❌ Error guardando período #${i + 1}:`, error)
+          throw error
+        }
+        
+        console.log(`✅ Período #${i + 1} guardado correctamente:`, data)
+      }
+
+      // 2. Crear el período ACTUAL (el contrato que se está creando)
+      if (formData.fecha_ingreso && formData.fecha_fin) {
+        console.log('📝 Guardando período ACTUAL del contrato')
+        
+        const { data, error } = await supabase.rpc('create_contract_period', {
+          contract_uuid: contractId,
+          p_fecha_inicio: formData.fecha_ingreso,
+          p_fecha_fin: formData.fecha_fin,
+          p_tipo_periodo: periodosHistorial.length === 0 ? 'inicial' : 'prorroga_automatica',
+          p_es_actual: true, // Este SÍ es el período actual
+          user_id: user.id
+        })
+
+        if (error) {
+          console.error('❌ Error guardando período actual:', error)
+          throw error
+        }
+        
+        console.log('✅ Período actual guardado correctamente:', data)
+      }
+
+      console.log('🎉 Historial completo guardado exitosamente')
+    } catch (error) {
+      console.error('💥 Error guardando historial de períodos:', error)
+      throw error
+    }
+  }
+
   const nextTab = () => {
     if (currentTab < tabs.length - 1) {
       setCurrentTab(currentTab + 1)
@@ -1019,11 +1146,16 @@ export default function ContractModal({
       }
 
       let error
+      let contractId = contract?.id
+      
       if (mode === 'create') {
         const result = await supabase
           .from('contracts')
           .insert([dataToSave])
+          .select()
+          .single()
         error = result.error
+        contractId = result.data?.id
       } else {
         const result = await supabase
           .from('contracts')
@@ -1033,6 +1165,11 @@ export default function ContractModal({
       }
 
       if (error) throw error
+
+      // Si es contrato fijo y hay períodos de historial, guardarlos
+      if (formData.tipo_contrato === 'fijo' && periodosHistorial.length > 0 && contractId) {
+        await guardarHistorialPeriodos(contractId)
+      }
 
       onSuccess()
     } catch (error: any) {
@@ -1402,6 +1539,55 @@ export default function ContractModal({
                     {errors.tipo_contrato && (
                       <p className="text-red-600 text-xs mt-1">{errors.tipo_contrato}</p>
                     )}
+                    
+                    {/* Botón de Historial - Solo para contratos fijos */}
+                    {formData.tipo_contrato === 'fijo' && !isReadOnly && (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowHistorialModal(true)}
+                          className={`w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md ${
+                            periodosHistorial.length > 0
+                              ? 'bg-gradient-to-r from-green-600 to-green-700 text-white'
+                              : 'bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white hover:from-[#065C5C] hover:to-[#0A6A6A]'
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m6-8a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="font-medium text-sm">
+                            {periodosHistorial.length > 0 
+                              ? `📝 Historial: ${periodosHistorial.length} períodos` 
+                              : '✨ Ingresar Historial de Períodos'
+                            }
+                          </span>
+                        </button>
+                        
+                        {periodosHistorial.length === 0 ? (
+                          <p className="text-xs text-gray-500 mt-1 text-center">
+                            ¿Este empleado ya tuvo prórrogas anteriores?
+                          </p>
+                        ) : (
+                          <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="text-xs text-green-800 text-center">
+                              <div className="font-medium">
+                                {contractFixedStatus && (
+                                  <>
+                                    🎯 Próximo será período #{contractFixedStatus.proximoPeriodo} • 
+                                    ⏱️ {contractFixedStatus.añosTotales} años trabajados
+                                    {contractFixedStatus.debeSerIndefinido && (
+                                      <div className="text-red-600 font-bold mt-1">
+                                        ⚠️ DEBE SER INDEFINIDO POR LEY
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Campo SENA mejorado con tooltip */}
@@ -1445,6 +1631,11 @@ export default function ContractModal({
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Fecha de Ingreso
+                      {periodosHistorial.length > 0 && formData.fecha_ingreso && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                          ✨ Auto-completada
+                        </span>
+                      )}
                     </label>
                     <input
                       type="date"
@@ -1452,6 +1643,11 @@ export default function ContractModal({
                       onChange={(e) => !isReadOnly && handleInputChange('fecha_ingreso', e.target.value)}
                       {...getInputProps('fecha_ingreso')}
                     />
+                    {periodosHistorial.length > 0 && formData.fecha_ingreso && (
+                      <p className="text-xs text-green-600 mt-1">
+                        📅 Calculada automáticamente: día siguiente al último período del historial
+                      </p>
+                    )}
                   </div>
 
                   {/* Fecha fin SIEMPRE visible - se deshabilita si es indefinido */}
@@ -1886,6 +2082,59 @@ export default function ContractModal({
           )}
         </div>
       </div>
+
+      {/* Modal de Historial de Períodos */}
+      <ContractHistorialModal
+        isOpen={showHistorialModal}
+        onClose={() => setShowHistorialModal(false)}
+        onSave={(periodos) => {
+          setPeriodosHistorial(periodos)
+          setShowHistorialModal(false)
+          
+          // Auto-completar fecha de inicio del contrato basándose en el historial
+          if (periodos.length > 0) {
+            // Encontrar el último período (mayor fecha_fin)
+            const ultimoPeriodo = periodos.reduce((ultimo, actual) => {
+              if (!ultimo.fecha_fin) return actual
+              if (!actual.fecha_fin) return ultimo
+              return new Date(actual.fecha_fin) > new Date(ultimo.fecha_fin) ? actual : ultimo
+            })
+            
+            if (ultimoPeriodo.fecha_fin) {
+              const fechaFinUltimo = new Date(ultimoPeriodo.fecha_fin)
+              fechaFinUltimo.setDate(fechaFinUltimo.getDate() + 1)
+              const fechaInicioSugerida = fechaFinUltimo.toISOString().split('T')[0]
+              
+              console.log('🗓️ Auto-completando fecha de inicio:', fechaInicioSugerida)
+              
+              // SIEMPRE actualizar la fecha basándose en el historial
+              setFormData(prev => ({ ...prev, fecha_ingreso: fechaInicioSugerida }))
+            }
+          }
+          
+          // Calcular y mostrar resumen
+          const diasTotales = periodos.reduce((total, periodo) => {
+            if (periodo.fecha_inicio && periodo.fecha_fin) {
+              const inicio = new Date(periodo.fecha_inicio)
+              const fin = new Date(periodo.fecha_fin)
+              const dias = Math.ceil((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)) + 1
+              return total + dias
+            }
+            return total
+          }, 0)
+          
+          const añosTotales = (diasTotales / 365).toFixed(2)
+          
+          setContractFixedStatus({
+            totalPeriodos: periodos.length,
+            diasTotales,
+            añosTotales: parseFloat(añosTotales),
+            proximoPeriodo: periodos.length + 1,
+            debeSerIndefinido: parseFloat(añosTotales) >= 4 || periodos.length >= 3
+          })
+        }}
+        periodosActuales={periodosHistorial}
+      />
     </div>
   )
 }

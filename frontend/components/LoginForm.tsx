@@ -36,16 +36,54 @@ export default function LoginForm() {
     setError('')
 
     try {
+      let loginEmail = email
+      
+      // Si no contiene @, asumir que es un alias y convertir a email interno
+      if (!email.includes('@')) {
+        try {
+          const { data: profileData, error: profileError } = await supabase
+            .rpc('get_user_profile_by_alias', { alias_param: email.toLowerCase() })
+          
+          if (profileError || !profileData || profileData.length === 0) {
+            setErrorWithTimeout('Usuario no encontrado')
+            setLoading(false)
+            return
+          }
+          
+          loginEmail = profileData[0].auth_email
+        } catch (err) {
+          setErrorWithTimeout('Error buscando usuario')
+          setLoading(false)
+          return
+        }
+      }
+
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: loginEmail,
         password,
       })
 
       if (authError) {
         setErrorWithTimeout(translateError(authError.message))
       } else {
-        // Login successful - redirect to dashboard
-        router.push('/dashboard')
+        // Verificar si tiene contraseña temporal
+        if (data.user) {
+          const { data: profileData } = await supabase
+            .from('user_profiles')
+            .select('is_temp_password, temp_password_expires_at')
+            .eq('user_id', data.user.id)
+            .single()
+          
+          if (profileData?.is_temp_password) {
+            // Redirigir a cambio de contraseña obligatorio
+            router.push('/dashboard?change_password=required')
+          } else {
+            // Login normal - redirect to dashboard
+            router.push('/dashboard')
+          }
+        } else {
+          router.push('/dashboard')
+        }
       }
     } catch (err) {
       setErrorWithTimeout('Error inesperado durante el inicio de sesión')
@@ -105,17 +143,17 @@ export default function LoginForm() {
         {/* Email Field */}
         <div className="relative">
           <label htmlFor="email" className="block text-sm font-bold text-[#004C4C] mb-2 lg:mb-3">
-            Correo electrónico
+            Usuario o Correo electrónico
           </label>
           <div className="relative">
             <input
               id="email"
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full px-4 lg:px-5 py-3 lg:py-4 bg-white bg-opacity-60 backdrop-blur-sm border-2 border-[#87E0E0] border-opacity-30 rounded-xl lg:rounded-2xl focus:outline-none focus:border-[#5FD3D2] focus:border-opacity-60 focus:bg-opacity-80 transition-all duration-300 text-[#004C4C] placeholder-[#065C5C] placeholder-opacity-60 font-medium text-sm lg:text-base"
-              placeholder="ejemplo@goodtalent.com"
+              placeholder="tu_alias o ejemplo@goodtalent.com"
             />
             {/* Field accent */}
             <div className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#87E0E0] to-[#5FD3D2] rounded-full transform scale-x-0 transition-transform duration-300 focus-within:scale-x-100"></div>

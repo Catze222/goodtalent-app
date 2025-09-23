@@ -24,17 +24,22 @@ import {
   RotateCcw,
   Power,
   PowerOff,
-  Loader2
+  Loader2,
+  Key
 } from 'lucide-react'
-import InviteUserModal from '@/components/dashboard/InviteUserModal'
+import CreateUserModal from '@/components/dashboard/CreateUserModal'
 import EditUserPermissionsModal from '@/components/dashboard/EditUserPermissionsModal'
 import ConfirmationModal from '@/components/dashboard/ConfirmationModal'
 import NotificationModal from '@/components/dashboard/NotificationModal'
+import PasswordResetResultModal from '@/components/dashboard/PasswordResetResultModal'
 
 interface UserWithPermissions {
-  id: string
-  email: string
-  created_at: string
+  user_id: string
+  alias: string
+  notification_email: string
+  display_name: string | null
+  is_temp_password: boolean
+  auth_email: string
   email_confirmed_at: string | null
   last_sign_in_at: string | null
   permissions_count: number
@@ -49,10 +54,12 @@ export default function UserManagementPage() {
   const [dataLoaded, setDataLoaded] = useState(false) // Track if data was loaded before
   const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<UserWithPermissions | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [togglingUser, setTogglingUser] = useState<string | null>(null)
+  const [resettingUser, setResettingUser] = useState<string | null>(null)
+  const [resetPasswordResult, setResetPasswordResult] = useState<{user: any, password: string} | null>(null)
   
   // Estados para modales modernos
   const [confirmModal, setConfirmModal] = useState<{
@@ -165,8 +172,8 @@ export default function UserManagementPage() {
       setLoadingRef(true)
       setLoading(true)
       
-      // Obtener usuarios de auth.users con conteo de permisos
-      const { data, error } = await supabase.rpc('get_users_with_permissions')
+      // Obtener usuarios con perfiles y conteo de permisos
+      const { data, error } = await supabase.rpc('get_all_user_profiles')
       
       if (error) {
         console.error('Error fetching users:', error)
@@ -196,7 +203,7 @@ export default function UserManagementPage() {
     const currentUserId = session.session?.user?.id
     
     // Prevenir autodesactivación en el frontend también
-    if (!user.is_banned && currentUserId === user.id) {
+    if (!user.is_banned && currentUserId === user.user_id) {
       showNotification(
         'Acción no permitida',
         'No puedes desactivar tu propia cuenta',
@@ -212,14 +219,14 @@ export default function UserManagementPage() {
     if (action === 'deactivate') {
       showConfirmation(
         'Desactivar Usuario',
-        `¿Estás seguro de que quieres desactivar a ${user.email}? El usuario no podrá acceder al sistema hasta que sea reactivado.`,
+        `¿Estás seguro de que quieres desactivar a ${user.alias}? El usuario no podrá acceder al sistema hasta que sea reactivado.`,
         () => executeUserToggle(user, action),
         'danger'
       )
     } else {
       showConfirmation(
         'Activar Usuario',
-        `¿Confirmas que quieres activar a ${user.email}? El usuario podrá acceder al sistema nuevamente.`,
+        `¿Confirmas que quieres activar a ${user.alias}? El usuario podrá acceder al sistema nuevamente.`,
         () => executeUserToggle(user, action),
         'success'
       )
@@ -228,7 +235,7 @@ export default function UserManagementPage() {
 
   const executeUserToggle = async (user: UserWithPermissions, action: string) => {
     try {
-      setTogglingUser(user.id)
+      setTogglingUser(user.user_id)
       closeConfirmModal()
       
       const { data: session } = await supabase.auth.getSession()
@@ -240,7 +247,7 @@ export default function UserManagementPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: user.id,
+          userId: user.user_id,
           action: action,
           userToken: session.session?.access_token
         })
@@ -277,8 +284,64 @@ export default function UserManagementPage() {
     }
   }
 
+  const handleResetPassword = async (user: UserWithPermissions) => {
+    showConfirmation(
+      'Resetear Contraseña',
+      `¿Confirmas que quieres resetear la contraseña de ${user.alias}? Se generará una nueva contraseña temporal que deberá cambiar en su próximo acceso.`,
+      () => executePasswordReset(user),
+      'warning'
+    )
+  }
+
+  const executePasswordReset = async (user: UserWithPermissions) => {
+    try {
+      setResettingUser(user.user_id)
+      closeConfirmModal()
+      
+      const { data: session } = await supabase.auth.getSession()
+      
+      const response = await fetch('/api/admin-reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: user.user_id,
+          userToken: session.session?.access_token
+        })
+      })
+
+      const result = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al resetear contraseña')
+      }
+
+      // Mostrar resultado con nueva contraseña
+      setResetPasswordResult({
+        user: result.user,
+        password: result.user.temporary_password
+      })
+      
+      // Refrescar la lista de usuarios
+      await fetchUsers()
+      
+    } catch (error: any) {
+      console.error('Error resetting password:', error)
+      showNotification(
+        'Error',
+        error.message || 'Error al resetear contraseña',
+        'error'
+      )
+    } finally {
+      setResettingUser(null)
+    }
+  }
+
   const filteredUsers = users.filter(user =>
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    user.alias.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.notification_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.display_name && user.display_name.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   // Debounce para búsqueda
@@ -357,12 +420,12 @@ export default function UserManagementPage() {
           <button
             onClick={() => {
               setSearchTerm('') // Limpiar filtro al abrir modal
-              setShowInviteModal(true)
+              setShowCreateModal(true)
             }}
             className="inline-flex items-center justify-center w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-[#5FD3D2] to-[#58BFC2] text-white font-semibold rounded-lg hover:from-[#58BFC2] hover:to-[#5FD3D2] transition-all duration-200 shadow-lg"
           >
             <UserPlus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-            <span className="text-sm sm:text-base">Invitar Usuario</span>
+            <span className="text-sm sm:text-base">Crear Usuario</span>
           </button>
         </div>
       </div>
@@ -374,7 +437,7 @@ export default function UserManagementPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
             type="text"
-            placeholder="Buscar por email..."
+            placeholder="Buscar por alias, email o nombre..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#5FD3D2] focus:border-transparent"
@@ -429,11 +492,11 @@ export default function UserManagementPage() {
             </p>
             {!searchTerm && (
           <button
-                onClick={() => setShowInviteModal(true)}
+                onClick={() => setShowCreateModal(true)}
                 className="inline-flex items-center px-4 py-2 bg-[#5FD3D2] text-white rounded-lg hover:bg-[#58BFC2] transition-colors"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Invitar Usuario
+                Crear Usuario
               </button>
             )}
           </div>
@@ -442,18 +505,23 @@ export default function UserManagementPage() {
             {/* Vista móvil - Tarjetas */}
             <div className="block lg:hidden space-y-3 p-3">
               {filteredUsers.map((user) => (
-                <div key={user.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-lg transition-all hover:border-[#5FD3D2]">
+                <div key={user.user_id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-lg transition-all hover:border-[#5FD3D2]">
                   <div className="space-y-4">
                     
                     {/* Header con nombre completo */}
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0 pr-2">
                         <h3 className="text-base font-semibold text-gray-900 truncate">
-                          {user.email.split('@')[0]}
+                          {user.alias}
                         </h3>
                         <p className="text-sm text-gray-600 truncate">
-                          {user.email}
+                          {user.display_name || user.notification_email}
                         </p>
+                        {user.is_temp_password && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 mt-1">
+                            Contraseña temporal
+                          </span>
+                        )}
                       </div>
                       
                       {/* Estado - ahora en la esquina superior derecha */}
@@ -490,14 +558,14 @@ export default function UserManagementPage() {
                       {user.email_confirmed_at && (
                         <button
                           onClick={() => toggleUserStatus(user)}
-                          disabled={togglingUser === user.id}
+                          disabled={togglingUser === user.user_id}
                           className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-all text-xs font-medium ${
                             user.is_banned
                               ? 'bg-green-50 text-green-600 hover:bg-green-100 border border-green-200'
                               : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
-                          } ${togglingUser === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          } ${togglingUser === user.user_id ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                          {togglingUser === user.id ? (
+                          {togglingUser === user.user_id ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
                           ) : user.is_banned ? (
                             <Power className="w-3 h-3" />
@@ -509,6 +577,21 @@ export default function UserManagementPage() {
                           </span>
                         </button>
                       )}
+                      
+                      {/* Botón Reset Contraseña */}
+                      <button
+                        onClick={() => handleResetPassword(user)}
+                        disabled={resettingUser === user.user_id}
+                        className="flex items-center space-x-1 px-3 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors text-xs font-medium disabled:opacity-50"
+                        title="Resetear contraseña"
+                      >
+                        {resettingUser === user.user_id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Key className="w-3 h-3" />
+                        )}
+                        <span className="hidden sm:inline">Reset</span>
+                      </button>
                       
                       {/* Botón Editar Permisos */}
                       <button
@@ -551,20 +634,25 @@ export default function UserManagementPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                 {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={user.user_id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-10 h-10 bg-gradient-to-br from-[#87E0E0] to-[#5FD3D2] rounded-full flex items-center justify-center">
                           <span className="text-[#004C4C] font-semibold text-sm">
-                            {user.email.charAt(0).toUpperCase()}
+                            {user.alias.charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {user.email.split('@')[0]}
+                          <div className="text-sm font-medium text-gray-900 flex items-center space-x-2">
+                            <span>{user.alias}</span>
+                            {user.is_temp_password && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                                Temp
+                              </span>
+                            )}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {user.email}
+                            {user.display_name || user.notification_email}
                           </div>
                         </div>
                       </div>
@@ -592,15 +680,15 @@ export default function UserManagementPage() {
                         {user.email_confirmed_at && (
                           <button
                             onClick={() => toggleUserStatus(user)}
-                            disabled={togglingUser === user.id}
+                            disabled={togglingUser === user.user_id}
                             className={`inline-flex items-center px-2 py-1 border text-xs leading-4 font-medium rounded-md transition-colors ${
                               user.is_banned
                                 ? 'text-green-700 bg-green-100 hover:bg-green-200 border-green-300'
                                 : 'text-red-700 bg-red-100 hover:bg-red-200 border-red-300'
-                            } ${togglingUser === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            } ${togglingUser === user.user_id ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title={user.is_banned ? 'Activar usuario' : 'Desactivar usuario'}
                           >
-                            {togglingUser === user.id ? (
+                            {togglingUser === user.user_id ? (
                               <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                             ) : user.is_banned ? (
                               <Power className="w-3 h-3 mr-1" />
@@ -610,6 +698,21 @@ export default function UserManagementPage() {
                             {user.is_banned ? 'Activar' : 'Desactivar'}
                           </button>
                         )}
+                        
+                        {/* Botón Reset Contraseña */}
+                        <button
+                          onClick={() => handleResetPassword(user)}
+                          disabled={resettingUser === user.user_id}
+                          className="inline-flex items-center px-2 py-1 border text-xs leading-4 font-medium rounded-md transition-colors text-amber-700 bg-amber-100 hover:bg-amber-200 border-amber-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Resetear contraseña"
+                        >
+                          {resettingUser === user.user_id ? (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          ) : (
+                            <Key className="w-3 h-3 mr-1" />
+                          )}
+                          Reset
+                        </button>
                         
                         {/* Botón Editar Permisos */}
                         <button
@@ -634,16 +737,16 @@ export default function UserManagementPage() {
       </div>
 
       {/* Modales */}
-      <InviteUserModal
-        isOpen={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
+      <CreateUserModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
         onSuccess={async () => {
           try {
-            // Refrescar la lista de usuarios después de una invitación exitosa
+            // Refrescar la lista de usuarios después de crear usuario
             await fetchUsers()
-            setShowInviteModal(false) // Asegurar que el modal se cierre
+            setShowCreateModal(false) // Asegurar que el modal se cierre
           } catch (error) {
-            console.error('Error refreshing users after invite:', error)
+            console.error('Error refreshing users after create:', error)
             // Forzar refresh de la página si falla el refresh
             window.location.reload()
           }
@@ -668,7 +771,7 @@ export default function UserManagementPage() {
             window.location.reload()
           }
         }}
-        user={selectedUser ? { id: selectedUser.id, email: selectedUser.email } : null}
+        user={selectedUser ? { id: selectedUser.user_id, email: selectedUser.alias } : null}
       />
 
       {/* Modales Modernos */}
@@ -689,6 +792,16 @@ export default function UserManagementPage() {
         title={notification.title}
         message={notification.message}
         type={notification.type}
+      />
+
+      <PasswordResetResultModal
+        isOpen={!!resetPasswordResult}
+        onClose={() => setResetPasswordResult(null)}
+        user={resetPasswordResult ? {
+          alias: resetPasswordResult.user.alias,
+          notification_email: resetPasswordResult.user.notification_email,
+          temporary_password: resetPasswordResult.password
+        } : null}
       />
     </div>
   )

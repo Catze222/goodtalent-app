@@ -1,5 +1,7 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { 
   Users, 
   Building2, 
@@ -8,14 +10,62 @@ import {
   AlertTriangle,
   FileText 
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
 import MetricCard from '../../components/dashboard/MetricCard'
 import ChartWidget from '../../components/dashboard/ChartWidget'
+import ChangePasswordModal from '../../components/dashboard/ChangePasswordModal'
 
 /**
  * Página principal del dashboard con métricas y gráficas
  * Muestra datos ficticios para visualización
  */
 export default function DashboardPage() {
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [userAlias, setUserAlias] = useState<string>()
+  const [loading, setLoading] = useState(true)
+  
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Verificar si necesita cambio de contraseña
+  useEffect(() => {
+    const checkPasswordStatus = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user) {
+          // Obtener perfil del usuario
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('alias, is_temp_password')
+            .eq('user_id', user.id)
+            .single()
+          
+          if (profile) {
+            setUserAlias(profile.alias)
+            
+            // Verificar si necesita cambio de contraseña (por parámetro URL o perfil)
+            const forceChange = searchParams.get('change_password') === 'required'
+            if (forceChange || profile.is_temp_password) {
+              setShowChangePassword(true)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking password status:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkPasswordStatus()
+  }, [searchParams])
+
+  const handlePasswordChangeSuccess = () => {
+    setShowChangePassword(false)
+    // Limpiar el parámetro de la URL
+    router.replace('/dashboard')
+  }
   
   // Datos ficticios para el dashboard
   const contratacionesData = [
@@ -202,6 +252,14 @@ export default function DashboardPage() {
         </div>
         
       </div>
+      
+      {/* Modal de cambio de contraseña */}
+      <ChangePasswordModal
+        isOpen={showChangePassword}
+        onSuccess={handlePasswordChangeSuccess}
+        userAlias={userAlias}
+        isRequired={true} // Siempre es obligatorio cuando se muestra desde dashboard
+      />
     </div>
   )
 }
