@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   Check, 
   X, 
@@ -15,7 +15,8 @@ import {
   CheckCircle,
   Trash2,
   Eye,
-  History
+  History,
+  AlertTriangle
 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { 
@@ -37,6 +38,153 @@ import { ContractRowWithCurrentData } from './ContractRowWithCurrentData'
 import { ContractAfiliacionesSection } from './ContractAfiliacionesSection'
 import ContractHistoryModal from './ContractHistoryModal'
 
+// Componente especializado para mostrar información de contratos fijos
+interface ContractFixedTermViewProps {
+  contract: Contract
+  currentData: {
+    fecha_fin_actual: string | null
+    loading: boolean
+  }
+  formatDate: (date: string) => string
+}
+
+const ContractFixedTermView: React.FC<ContractFixedTermViewProps> = ({ 
+  contract, 
+  currentData, 
+  formatDate 
+}) => {
+  const [periodInfo, setPeriodInfo] = useState<{
+    currentPeriod: any | null
+    nextExtension: any | null
+    loading: boolean
+  }>({
+    currentPeriod: null,
+    nextExtension: null,
+    loading: true
+  })
+
+  useEffect(() => {
+    const loadPeriodInfo = async () => {
+      if (!contract.id) return
+
+      try {
+        // Obtener período actual (vigente)
+        const { data: currentPeriod } = await supabase
+          .from('historial_contratos_fijos')
+          .select('*')
+          .eq('contract_id', contract.id)
+          .eq('es_periodo_actual', true)
+          .single()
+
+        // Buscar la SIGUIENTE prórroga futura (período que empieza después del actual)
+        let nextExtension = null
+        if (currentPeriod?.fecha_fin) {
+          const { data: futurePeriod } = await supabase
+            .from('historial_contratos_fijos')
+            .select('*')
+            .eq('contract_id', contract.id)
+            .eq('es_periodo_actual', false)
+            .gt('fecha_inicio', currentPeriod.fecha_fin) // Empieza después del período actual
+            .order('fecha_inicio', { ascending: true })
+            .limit(1)
+            .single()
+          
+          nextExtension = futurePeriod
+        }
+
+        setPeriodInfo({
+          currentPeriod: currentPeriod || null,
+          nextExtension: nextExtension || null,
+          loading: false
+        })
+      } catch (error) {
+        setPeriodInfo({
+          currentPeriod: null,
+          nextExtension: null,
+          loading: false
+        })
+      }
+    }
+
+    loadPeriodInfo()
+  }, [contract.id])
+
+  // Usar la fecha del período actual, no la de currentData
+  const fechaFinPeriodoActual = periodInfo.currentPeriod?.fecha_fin || currentData.fecha_fin_actual
+  
+  if (!fechaFinPeriodoActual) {
+    return <span className="text-gray-400">Sin fecha de fin</span>
+  }
+
+  const fechaFin = new Date(fechaFinPeriodoActual)
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  fechaFin.setHours(0, 0, 0, 0)
+  
+  const diffTime = fechaFin.getTime() - hoy.getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  
+  // Determinar niveles de alerta
+  const isCritical = diffDays <= 35 && diffDays > 0 && !periodInfo.nextExtension  // CRÍTICO: ≤35 días
+  const needsAlert = diffDays <= 45 && diffDays > 0 && !periodInfo.nextExtension  // ATENCIÓN: ≤45 días
+  const isUrgent = diffDays <= 30 && diffDays > 0 && !periodInfo.nextExtension    // URGENTE: ≤30 días (mantenemos para compatibilidad)
+
+  return (
+    <div>
+      {/* Fecha del período vigente actual */}
+      <div className="flex items-center space-x-1">
+        <span className={`font-medium ${
+          isCritical ? 'text-red-700' :      // CRÍTICO: Rojo más intenso
+          isUrgent ? 'text-red-600' :        // URGENTE: Rojo normal
+          needsAlert ? 'text-amber-600' :    // ATENCIÓN: Ámbar
+          'text-gray-900'                    // NORMAL: Negro
+        }`}>
+          {formatDate(fechaFinPeriodoActual)}
+        </span>
+        {needsAlert && (
+          <AlertTriangle className={`h-3 w-3 ${
+            isCritical ? 'text-red-700' : 
+            isUrgent ? 'text-red-500' : 
+            'text-amber-500'
+          }`} />
+        )}
+      </div>
+
+      {/* Información del período y alerta */}
+      <div className="text-xs mt-1 space-y-0.5">
+        {periodInfo.loading ? (
+          <div className="text-gray-500">Cargando períodos...</div>
+        ) : (
+          <>
+            {/* Solo la SIGUIENTE prórroga programada */}
+            {periodInfo.nextExtension ? (
+              <div className="text-green-600 font-medium">
+                ✅ Prórroga → {formatDate(periodInfo.nextExtension.fecha_fin)}
+              </div>
+            ) : needsAlert ? (
+              <div className={`font-medium ${
+                isCritical ? 'text-red-700' : 
+                isUrgent ? 'text-red-600' : 
+                'text-amber-600'
+              }`}>
+                {isCritical ? '🔥 CRÍTICO:' : 
+                 isUrgent ? '🚨 URGENTE:' : 
+                 '⚠️ ATENCIÓN:'} {diffDays} días restantes
+              </div>
+            ) : (
+              <div className="text-gray-500">
+                {diffDays > 0 ? `Faltan ${diffDays} días` : 
+                 diffDays === 0 ? 'Vence hoy' : 
+                 `Venció hace ${Math.abs(diffDays)} días`}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 interface ContractsTableProps {
   contracts: Contract[]
   onEdit: (contract: Contract) => void
@@ -44,6 +192,7 @@ interface ContractsTableProps {
   canUpdate: boolean
   canDelete: boolean
   onApprove?: (contract: Contract) => void
+  refreshTrigger?: number
 }
 
 type OnboardingField = 
@@ -72,12 +221,13 @@ export default function ContractsTable({
   onUpdate,
   canUpdate,
   canDelete,
-  onApprove
+  onApprove,
+  refreshTrigger = 0
 }: ContractsTableProps) {
-  const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0)
   
   const handleNovedadSuccess = () => {
-    setRefreshTrigger(prev => prev + 1)
+    setLocalRefreshTrigger(prev => prev + 1)
     onUpdate()
   }
   const [loadingInline, setLoadingInline] = useState<Set<string>>(new Set())
@@ -612,7 +762,7 @@ export default function ContractsTable({
               const progress = contract.contracts_onboarding_progress || 0
 
               return (
-                <ContractRowWithCurrentData key={contract.id!} contract={contract} refreshTrigger={refreshTrigger}>
+                <ContractRowWithCurrentData key={contract.id!} contract={contract} refreshTrigger={refreshTrigger + localRefreshTrigger}>
                   {(currentData) => (
                     <div>
                       {/* Fila principal - Dentro del scroll unificado */}
@@ -679,7 +829,7 @@ export default function ContractsTable({
                             <ContractApprovalButton 
                               contract={contract} 
                               onSuccess={() => onApprove(contract)}
-                              className="text-xs px-2 py-1"
+                              className="text-xs px-2 py-1 whitespace-nowrap"
                             />
                           )}
                           
@@ -689,7 +839,7 @@ export default function ContractsTable({
                               contractId={contract.id!}
                               contractName={currentData.fullName}
                               onSuccess={handleNovedadSuccess}
-                              className="text-xs px-2 py-1"
+                              className="text-xs px-2 py-1 whitespace-nowrap"
                             />
                           )}
                           
@@ -708,6 +858,7 @@ export default function ContractsTable({
                             )}
                           </div>
                           <div className="text-sm text-gray-500 mb-1">{contract.tipo_identificacion} {contract.numero_identificacion}</div>
+                          
                           <ContractStatusCompact 
                             contract={contract} 
                             isTerminated={currentData.is_terminated}
@@ -732,7 +883,16 @@ export default function ContractsTable({
                     {/* Contrato */}
                     <div>
                       <div className="text-base font-medium truncate">{contract.numero_contrato_helisa}</div>
-                      <div className="text-sm text-gray-500">
+                      
+                      {/* Tipo de contrato en negrilla */}
+                      <div className="text-sm font-bold text-gray-900 mt-1">
+                        {contract.tipo_contrato === 'fijo' ? 'Fijo' :
+                         contract.tipo_contrato === 'indefinido' ? 'Indefinido' :
+                         contract.tipo_contrato === 'obra_labor' ? 'Obra/Labor' :
+                         contract.tipo_contrato}
+                      </div>
+                      
+                      <div className="text-sm text-gray-500 mt-1">
                         {currentData.loading ? (
                           contract.cargo || '-'
                         ) : (
@@ -774,6 +934,13 @@ export default function ContractsTable({
                             })()}
                           </div>
                         </div>
+                      ) : contract.tipo_contrato === 'fijo' ? (
+                        // VISTA ESPECIAL PARA CONTRATOS FIJOS
+                        <ContractFixedTermView 
+                          contract={contract}
+                          currentData={currentData}
+                          formatDate={formatDate}
+                        />
                       ) : (
                         currentData.fecha_fin_actual ? (
                           <div>
@@ -1175,7 +1342,7 @@ export default function ContractsTable({
           const statusConfig = getContractStatusConfig(contract)
 
           return (
-            <ContractRowWithCurrentData key={contract.id!} contract={contract} refreshTrigger={refreshTrigger}>
+            <ContractRowWithCurrentData key={contract.id!} contract={contract} refreshTrigger={refreshTrigger + localRefreshTrigger}>
               {(currentData) => (
                 <div className="p-4 space-y-3">
                   {/* Info básica */}
@@ -1190,6 +1357,20 @@ export default function ContractsTable({
                         currentData.fullName
                       )}
                     </div>
+                    
+                    {/* Info contratos fijos - misma lógica que desktop */}
+                    {contract.tipo_contrato === 'fijo' && (
+                      <div className="text-sm mt-1">
+                        <span className="font-medium">Contrato Fijo</span>
+                        <span className="text-gray-400"> • </span>
+                        <ContractFixedTermView 
+                          contract={contract}
+                          currentData={currentData}
+                          formatDate={formatDate}
+                        />
+                      </div>
+                    )}
+                    
                 <div className="flex flex-wrap gap-2 text-sm">
                   <span className={`px-2 py-1 text-xs rounded-full font-medium ${
                     contract.empresa_interna === 'Good' 
@@ -1218,14 +1399,14 @@ export default function ContractsTable({
               </div>
 
               {/* Botones de acción */}
-              <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                <div className="flex space-x-2">
+              <div className="pt-2 border-t border-gray-100">
+                <div className="flex flex-wrap gap-2">
                   {/* Botón de editar/ver */}
                   {statusConfig.can_edit ? (
                     canUpdate && (
                       <button
                         onClick={() => onEdit(contract)}
-                        className="flex items-center space-x-1 px-3 py-2 bg-[#004C4C] text-white rounded-lg text-sm font-medium hover:bg-[#065C5C] transition-colors"
+                        className="flex items-center space-x-1 px-3 py-2 bg-[#004C4C] text-white rounded-lg text-sm font-medium hover:bg-[#065C5C] transition-colors flex-shrink-0"
                       >
                         <Edit className="h-4 w-4" />
                         <span>Editar</span>
@@ -1234,7 +1415,7 @@ export default function ContractsTable({
                   ) : (
                     <button
                       onClick={() => onEdit(contract)}
-                      className="flex items-center space-x-1 px-3 py-2 bg-gray-500 text-white rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors"
+                      className="flex items-center space-x-1 px-3 py-2 bg-gray-500 text-white rounded-lg text-sm font-medium hover:bg-gray-600 transition-colors flex-shrink-0"
                     >
                       <Eye className="h-4 w-4" />
                       <span>Ver</span>
@@ -1247,7 +1428,7 @@ export default function ContractsTable({
                       setHistoryContract(contract)
                       setShowHistoryModal(true)
                     }}
-                    className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-[#004C4C] to-[#065C5C] text-white rounded-lg text-sm font-medium hover:from-[#065C5C] hover:to-[#0A6A6A] transition-all duration-200 shadow-sm hover:shadow-md transform hover:scale-105"
+                    className="flex items-center space-x-1 px-3 py-2 bg-[#004C4C] text-white rounded-lg text-sm font-medium hover:bg-[#065C5C] transition-colors flex-shrink-0"
                     title="Ver historial completo del contrato"
                   >
                     <History className="h-4 w-4" />
@@ -1256,27 +1437,33 @@ export default function ContractsTable({
                   
                   {/* Botón de aprobar */}
                   {statusConfig.can_approve && onApprove && (
-                    <ContractApprovalButton 
-                      contract={contract}
-                      onSuccess={() => onApprove(contract)}
-                    />
+                    <div className="flex-shrink-0">
+                      <ContractApprovalButton 
+                        contract={contract}
+                        onSuccess={() => onApprove(contract)}
+                        className="px-3 py-2 text-sm font-medium"
+                      />
+                    </div>
                   )}
                   
-                          {/* Botón de novedades */}
-                          {contract.status_aprobacion === 'aprobado' && !currentData.is_terminated && (
-                            <NovedadButton
-                              contractId={contract.id!}
-                              contractName={currentData.fullName}
-                              onSuccess={handleNovedadSuccess}
-                            />
-                          )}
+                  {/* Botón de novedades */}
+                  {contract.status_aprobacion === 'aprobado' && !currentData.is_terminated && (
+                    <div className="flex-shrink-0">
+                      <NovedadButton
+                        contractId={contract.id!}
+                        contractName={currentData.fullName}
+                        onSuccess={handleNovedadSuccess}
+                        className="px-3 py-2 text-sm font-medium"
+                      />
+                    </div>
+                  )}
                   
                   
                   {/* Botón de eliminar */}
                   {canDelete && statusConfig.can_delete && (
                     <button
                       onClick={() => setContractToDelete(contract)}
-                      className="flex items-center space-x-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+                      className="flex items-center space-x-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors flex-shrink-0"
                     >
                       <Trash2 className="h-4 w-4" />
                       <span>Eliminar</span>

@@ -72,6 +72,19 @@ export default function NovedadTiempoLaboralModal({
   contractName
 }: NovedadTiempoLaboralModalProps) {
   const { user } = usePermissions()
+
+  // Función helper para sumar días sin problemas de zona horaria
+  const sumarDiasAFecha = (fechaString: string, dias: number): string => {
+    const [año, mes, dia] = fechaString.split('-').map(Number)
+    const fecha = new Date(año, mes - 1, dia)
+    fecha.setDate(fecha.getDate() + dias)
+    
+    const añoResult = fecha.getFullYear()
+    const mesResult = String(fecha.getMonth() + 1).padStart(2, '0')
+    const diaResult = String(fecha.getDate()).padStart(2, '0')
+    
+    return `${añoResult}-${mesResult}-${diaResult}`
+  }
   const [selectedType, setSelectedType] = useState<typeof TIEMPO_LABORAL_TYPES[0] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
@@ -119,10 +132,39 @@ export default function NovedadTiempoLaboralModal({
           .single()
 
         if (contract) {
-          console.log('Contract data loaded:', contract) // Debug temporal
+          console.log('🔍 DEBUG - Contract data loaded:', contract)
+          
+          // Para contratos fijos, obtener la fecha fin del período actual
+          let fechaFinReal = contract.fecha_fin
+          console.log('🔍 DEBUG - Fecha fin del contrato base:', contract.fecha_fin)
+          
+          if (contract.tipo_contrato === 'fijo') {
+            console.log('🔍 DEBUG - Es contrato fijo, buscando período actual...')
+            
+            // Buscar el período actual en historial_contratos_fijos
+            const { data: periodoActual, error: errorPeriodo } = await supabase
+              .from('historial_contratos_fijos')
+              .select('fecha_fin, fecha_inicio, numero_periodo')
+              .eq('contract_id', contractId)
+              .eq('es_periodo_actual', true)
+              .single()
+            
+            console.log('🔍 DEBUG - Período actual encontrado:', periodoActual)
+            console.log('🔍 DEBUG - Error al buscar período:', errorPeriodo)
+            
+            if (periodoActual?.fecha_fin) {
+              fechaFinReal = periodoActual.fecha_fin
+              console.log('🔍 DEBUG - ✅ Usando fecha del período actual:', fechaFinReal)
+            } else {
+              console.log('🔍 DEBUG - ❌ No se encontró período actual, usando fecha del contrato')
+            }
+          }
+          
+          console.log('🔍 DEBUG - Fecha fin final que se usará:', fechaFinReal)
+          
           setContractInfo({
             fecha_inicio: contract.fecha_ingreso,
-            fecha_fin: contract.fecha_fin,
+            fecha_fin: fechaFinReal,
             tipo_contrato: contract.tipo_contrato,
             numero_contrato_helisa: contract.numero_contrato_helisa
           })
@@ -596,13 +638,7 @@ export default function NovedadTiempoLaboralModal({
                             Fecha de Inicio de la Prórroga
                           </label>
                           <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
-                            {contractInfo.fecha_fin ? (
-                              (() => {
-                                const fechaFin = new Date(contractInfo.fecha_fin)
-                                fechaFin.setDate(fechaFin.getDate() + 1)
-                                return fechaFin.toISOString().split('T')[0]
-                              })()
-                            ) : 'N/A'}
+                            {contractInfo.fecha_fin ? sumarDiasAFecha(contractInfo.fecha_fin, 1) : 'N/A'}
                           </div>
                           <p className="text-xs text-gray-500 mt-1">
                             <strong>Automático:</strong> Un día después del fin actual ({contractInfo.fecha_fin})
@@ -618,25 +654,13 @@ export default function NovedadTiempoLaboralModal({
                             type="date"
                             value={formData.nueva_fecha_fin}
                             onChange={(e) => handleInputChange('nueva_fecha_fin', e.target.value)}
-                            min={contractInfo.fecha_fin ? (
-                              (() => {
-                                const fechaFin = new Date(contractInfo.fecha_fin)
-                                fechaFin.setDate(fechaFin.getDate() + 1)
-                                return fechaFin.toISOString().split('T')[0]
-                              })()
-                            ) : undefined}
+                            min={contractInfo.fecha_fin ? sumarDiasAFecha(contractInfo.fecha_fin, 1) : undefined}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             required
                           />
                           <p className="text-xs text-gray-500 mt-1">
                             Debe ser posterior a: <strong>
-                              {contractInfo.fecha_fin ? (
-                                (() => {
-                                  const fechaFin = new Date(contractInfo.fecha_fin)
-                                  fechaFin.setDate(fechaFin.getDate() + 1)
-                                  return fechaFin.toISOString().split('T')[0]
-                                })()
-                              ) : 'N/A'}
+                              {contractInfo.fecha_fin ? sumarDiasAFecha(contractInfo.fecha_fin, 1) : 'N/A'}
                             </strong>
                           </p>
                         </div>

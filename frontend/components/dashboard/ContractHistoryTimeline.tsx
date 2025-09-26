@@ -37,21 +37,33 @@ export default function ContractHistoryTimeline({
   className = ''
 }: ContractHistoryTimelineProps) {
 
-  // Calcular días de un período
+  // Calcular días de un período (sin problemas de zona horaria)
   const calculatePeriodDays = (fechaInicio: string, fechaFin: string): number => {
-    const start = new Date(fechaInicio)
-    const end = new Date(fechaFin)
+    // Parsear fechas sin problemas de zona horaria
+    const [startYear, startMonth, startDay] = fechaInicio.split('-').map(Number)
+    const [endYear, endMonth, endDay] = fechaFin.split('-').map(Number)
+    
+    const start = new Date(startYear, startMonth - 1, startDay)
+    const end = new Date(endYear, endMonth - 1, endDay)
+    
     const diffTime = Math.abs(end.getTime() - start.getTime())
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1 // +1 para incluir ambos días
   }
 
-  // Formatear fecha para mostrar
+  // Formatear fecha para mostrar (sin problemas de zona horaria)
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
+    // Parsear la fecha sin crear problemas de zona horaria
+    const [year, month, day] = dateString.split('-').map(Number)
+    
+    // Crear objeto Date con valores locales
+    const date = new Date(year, month - 1, day)
+    
+    // Formatear manualmente para evitar problemas de zona horaria
+    const dayStr = String(date.getDate()).padStart(2, '0')
+    const monthStr = String(date.getMonth() + 1).padStart(2, '0')
+    const yearStr = date.getFullYear()
+    
+    return `${dayStr}/${monthStr}/${yearStr}`
   }
 
   // Obtener label del tipo de período

@@ -38,6 +38,7 @@ export default function ContratosPage() {
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
   const [toastType, setToastType] = useState<'success'|'error'|'info'>('success')
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const { hasPermission, loading: permissionsLoading, permissions } = usePermissions()
   
@@ -242,6 +243,39 @@ export default function ContratosPage() {
     // Filtro por vigencia
     const matchesVigencia = (() => {
       if (filterVigencia === 'all') return true
+      
+      if (filterVigencia === 'por_vencer') {
+        // Solo contratos fijos activos que vencen entre 36-45 días sin prórroga
+        if (contract.tipo_contrato !== 'fijo' || getStatusVigencia(contract.fecha_fin) !== 'activo') return false
+        if (!contract.fecha_fin) return false
+        
+        const fechaFin = new Date(contract.fecha_fin)
+        const hoy = new Date()
+        hoy.setHours(0, 0, 0, 0)
+        fechaFin.setHours(0, 0, 0, 0)
+        
+        const diffTime = fechaFin.getTime() - hoy.getTime()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        
+        return diffDays <= 45 && diffDays > 35
+      }
+      
+      if (filterVigencia === 'critico') {
+        // Solo contratos fijos activos que vencen en 35 días o menos sin prórroga
+        if (contract.tipo_contrato !== 'fijo' || getStatusVigencia(contract.fecha_fin) !== 'activo') return false
+        if (!contract.fecha_fin) return false
+        
+        const fechaFin = new Date(contract.fecha_fin)
+        const hoy = new Date()
+        hoy.setHours(0, 0, 0, 0)
+        fechaFin.setHours(0, 0, 0, 0)
+        
+        const diffTime = fechaFin.getTime() - hoy.getTime()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        
+        return diffDays <= 35 && diffDays > 0
+      }
+      
       const statusVigencia = getStatusVigencia(contract.fecha_fin)
       return filterVigencia === statusVigencia
     })()
@@ -254,18 +288,12 @@ export default function ContratosPage() {
       switch (filterOnboarding) {
         case 'all':
           return true
-        case 'completos':
-          return (contract.contracts_onboarding_progress || 0) === 100
         
         // Filtros principales
-        case 'sin_examenes':
-          return !contract.examenes
         case 'sin_arl':
           return !(contract.arl_nombre && contract.arl_fecha_confirmacion)
         case 'sin_eps':
           return !contract.eps_fecha_confirmacion
-        case 'sin_contrato':
-          return !contract.recibido_contrato_firmado
         
         // Filtros adicionales
         case 'sin_programacion_cita':
@@ -294,7 +322,6 @@ export default function ContratosPage() {
     total: contracts.length,
     good: contracts.filter(c => c.empresa_interna === 'Good').length,
     cps: contracts.filter(c => c.empresa_interna === 'CPS').length,
-    completed: contracts.filter(c => (c.contracts_onboarding_progress || 0) === 100).length,
     inProgress: contracts.filter(c => {
       const progress = c.contracts_onboarding_progress || 0
       return progress > 0 && progress < 100
@@ -313,13 +340,41 @@ export default function ContratosPage() {
     
     // Estados de vigencia
     activo: contracts.filter(c => getStatusVigencia(c.fecha_fin) === 'activo').length,
+    porVencer: contracts.filter(c => {
+      // Solo contratos fijos activos que vencen en 45 días o menos sin prórroga
+      if (c.tipo_contrato !== 'fijo' || getStatusVigencia(c.fecha_fin) !== 'activo') return false
+      if (!c.fecha_fin) return false
+      
+      const fechaFin = new Date(c.fecha_fin)
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0)
+      fechaFin.setHours(0, 0, 0, 0)
+      
+      const diffTime = fechaFin.getTime() - hoy.getTime()
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      
+      return diffDays <= 45 && diffDays > 35  // Por vencer: entre 36-45 días
+    }).length,
+    critico: contracts.filter(c => {
+      // Solo contratos fijos activos que vencen en 35 días o menos sin prórroga
+      if (c.tipo_contrato !== 'fijo' || getStatusVigencia(c.fecha_fin) !== 'activo') return false
+      if (!c.fecha_fin) return false
+      
+      const fechaFin = new Date(c.fecha_fin)
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0)
+      fechaFin.setHours(0, 0, 0, 0)
+      
+      const diffTime = fechaFin.getTime() - hoy.getTime()
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      
+      return diffDays <= 35 && diffDays > 0  // Crítico: ≤35 días
+    }).length,
     terminado: contracts.filter(c => getStatusVigencia(c.fecha_fin) === 'terminado').length,
     
     // Campos principales
-    sinExamenes: contracts.filter(c => !c.examenes).length,
     sinArl: contracts.filter(c => !(c.arl_nombre && c.arl_fecha_confirmacion)).length,
     sinEps: contracts.filter(c => !c.eps_fecha_confirmacion).length,
-    sinContrato: contracts.filter(c => !c.recibido_contrato_firmado).length,
     
     // Campos adicionales
     sinProgramacionCita: contracts.filter(c => !c.programacion_cita_examenes).length,
@@ -328,6 +383,11 @@ export default function ContratosPage() {
     sinSolicitudEps: contracts.filter(c => !c.solicitud_eps).length,
     sinCaja: contracts.filter(c => !c.caja_fecha_confirmacion).length,
     sinRadicados: contracts.filter(c => !c.radicado_eps && !c.radicado_ccf).length,
+    
+    // Propiedades faltantes requeridas por ContractsFilters
+    completed: contracts.filter(c => (c.contracts_onboarding_progress || 0) === 100).length,
+    sinExamenes: contracts.filter(c => !c.examenes || !c.examenes_fecha).length,
+    sinContrato: contracts.filter(c => !c.recibido_contrato_firmado || !c.contrato_fecha_confirmacion).length,
   }
 
   const handleCreateNew = () => {
@@ -363,10 +423,17 @@ export default function ContratosPage() {
     setToastType('success')
     setToastMsg(modalMode === 'create' ? 'Contrato creado exitosamente' : 'Contrato actualizado exitosamente')
     setToastOpen(true)
-    // Invalidar cache y recargar
+    
+    // Forzar refresh completo de todos los componentes
     localStorage.removeItem('contracts_cache_v3')
     setDataLoaded(false)
-    loadContracts()
+    setLoading(true)
+    setRefreshTrigger(prev => prev + 1) // Trigger para componentes hijos
+    
+    // Usar timeout para asegurar que el estado se actualice
+    setTimeout(() => {
+      loadContracts()
+    }, 100)
   }
 
   // Mostrar loading mientras los permisos cargan
@@ -483,6 +550,7 @@ export default function ContratosPage() {
           onUpdate={() => {
             localStorage.removeItem('contracts_cache_v3')
             setDataLoaded(false)
+            setRefreshTrigger(prev => prev + 1)
             loadContracts()
           }}
           canUpdate={canUpdate}
@@ -491,8 +559,10 @@ export default function ContratosPage() {
             // El componente maneja la aprobación internamente
             localStorage.removeItem('contracts_cache_v3')
             setDataLoaded(false)
+            setRefreshTrigger(prev => prev + 1)
             loadContracts()
           }}
+          refreshTrigger={refreshTrigger}
         />
         </div>
       )}

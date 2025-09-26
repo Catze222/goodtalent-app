@@ -156,15 +156,7 @@ export default function NovedadTerminacionModal({
       return
     }
 
-    // Validar que la fecha no sea futura
-    const fechaTerminacion = new Date(fecha)
-    const hoy = new Date()
-    hoy.setHours(0, 0, 0, 0)
-    
-    if (fechaTerminacion > hoy) {
-      setError('La fecha de terminación no puede ser futura')
-      return
-    }
+    // Permitir fechas futuras para terminaciones programadas
 
     setLoading(true)
 
@@ -382,12 +374,11 @@ export default function NovedadTerminacionModal({
                     type="date"
                     value={fecha}
                     onChange={(e) => setFecha(e.target.value)}
-                    max={new Date().toISOString().split('T')[0]}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    No puede ser una fecha futura
+                    Puede ser una fecha futura para programar la terminación
                   </p>
                 </div>
               </div>

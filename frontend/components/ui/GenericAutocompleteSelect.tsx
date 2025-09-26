@@ -40,6 +40,7 @@ export default function GenericAutocompleteSelect({
   const [inputValue, setInputValue] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 })
+  const [isSelecting, setIsSelecting] = useState(false)
   
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -84,34 +85,43 @@ export default function GenericAutocompleteSelect({
   }
 
   const handleItemSelect = (item: Option) => {
+    setIsSelecting(true)
+    onChange(item.id) // Cambiar el valor primero
     setInputValue(item.nombre)
-    onChange(item.id)
     setIsOpen(false)
     setHighlightedIndex(-1)
+    
+    // Resetear la bandera después de un breve delay
+    setTimeout(() => {
+      setIsSelecting(false)
+    }, 250)
   }
 
   const handleInputFocus = () => {
     if (!disabled) {
-      setInputValue('')
+      // Solo limpiar si no hay nada seleccionado, para facilitar búsqueda
+      if (!value) {
+        setInputValue('')
+      }
       setIsOpen(true)
     }
   }
 
   const handleInputBlur = () => {
-    // Delay para permitir clicks en las opciones
+    // Delay más largo para permitir onMouseDown
     setTimeout(() => {
+      // No procesar blur si se está seleccionando un item
+      if (isSelecting) return
+      
       setIsOpen(false)
       setHighlightedIndex(-1)
       
-      // Si no hay coincidencia exacta, limpiar
-      const exactMatch = options.find(item => 
-        item.nombre.toLowerCase() === inputValue.toLowerCase()
-      )
-      if (!exactMatch && inputValue) {
+      // Solo limpiar si realmente no hay valor seleccionado válido
+      if (!value && inputValue) {
         setInputValue('')
         onChange('')
       }
-    }, 150)
+    }, 200)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -134,6 +144,9 @@ export default function GenericAutocompleteSelect({
         e.preventDefault()
         if (highlightedIndex >= 0 && filteredItems[highlightedIndex]) {
           handleItemSelect(filteredItems[highlightedIndex])
+        } else if (filteredItems.length === 1) {
+          // Si solo hay una opción filtrada, seleccionarla automáticamente
+          handleItemSelect(filteredItems[0])
         }
         break
       case 'Escape':
@@ -208,7 +221,10 @@ export default function GenericAutocompleteSelect({
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => handleItemSelect(item)}
+                    onMouseDown={(e) => {
+                      e.preventDefault() // Prevenir que se dispare onBlur
+                      handleItemSelect(item)
+                    }}
                     className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors flex items-center justify-between ${
                       highlightedIndex === index 
                         ? 'bg-blue-100 text-blue-900' 

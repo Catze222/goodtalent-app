@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CheckCircle, Loader2, Shield, Calendar, User } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { Contract } from '../../types/contract'
@@ -24,13 +24,29 @@ export default function ContractApprovalButton({
   const [error, setError] = useState<string | null>(null)
   const [numeroContrato, setNumeroContrato] = useState('')
 
-  const handleApprove = async () => {
-    // Validar número de contrato
-    if (!numeroContrato.trim()) {
-      setError('El número de contrato es obligatorio')
-      return
+  // Generar número de contrato automáticamente cuando se abre el modal
+  useEffect(() => {
+    if (showConfirmation) {
+      const generateContractNumber = () => {
+        const cedula = contract.numero_identificacion || 'SIN-CEDULA'
+        const fechaIngreso = contract.fecha_ingreso || 'SIN-FECHA'
+        const empresaCliente = contract.company?.name || 'SIN-EMPRESA'
+        
+        // Limpiar empresa cliente (quitar espacios y caracteres especiales)
+        const empresaLimpia = empresaCliente
+          .toUpperCase()
+          .replace(/\s+/g, '-')
+          .replace(/[^A-Z0-9-]/g, '')
+          .substring(0, 15) // Máximo 15 caracteres
+        
+        return `${cedula}-${fechaIngreso}-${empresaLimpia}`
+      }
+      
+      setNumeroContrato(generateContractNumber())
     }
+  }, [showConfirmation, contract])
 
+  const handleApprove = async () => {
     setLoading(true)
     setError(null)
 
@@ -127,19 +143,21 @@ export default function ContractApprovalButton({
                 </div>
               </div>
 
-              {/* Input para número de contrato */}
+              {/* Número de contrato generado automáticamente */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Número de Contrato Helisa *
+                  Contrato *
                 </label>
                 <input
                   type="text"
                   value={numeroContrato}
-                  onChange={(e) => setNumeroContrato(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="Ej: GOOD-2025-001"
-                  disabled={loading}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                  placeholder="Generando número de contrato..."
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Número generado automáticamente: cédula-fecha_ingreso-empresa_cliente
+                </p>
               </div>
 
               {/* Advertencia de campos incompletos - Más compacta */}

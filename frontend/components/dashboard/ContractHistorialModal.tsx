@@ -67,9 +67,7 @@ export default function ContractHistorialModal({
     if (periodos.length > 0) {
       const ultimoPeriodo = periodos[periodos.length - 1]
       if (ultimoPeriodo.fecha_fin) {
-        const fechaFin = new Date(ultimoPeriodo.fecha_fin)
-        fechaFin.setDate(fechaFin.getDate() + 1)
-        fechaInicioSugerida = fechaFin.toISOString().split('T')[0]
+        fechaInicioSugerida = sumarDiasAFecha(ultimoPeriodo.fecha_fin, 1)
       }
     }
     
@@ -98,19 +96,52 @@ export default function ContractHistorialModal({
     const nuevos = [...periodos]
     nuevos[index] = { ...nuevos[index], [campo]: valor }
     
-    // Si se actualiza la fecha_fin de un período, actualizar fecha_inicio del siguiente
-    if (campo === 'fecha_fin' && valor && index < nuevos.length - 1) {
-      const fechaFin = new Date(valor)
-      fechaFin.setDate(fechaFin.getDate() + 1)
-      const fechaInicioSiguiente = fechaFin.toISOString().split('T')[0]
-      
-      // Solo actualizar si el siguiente período no tiene fecha_inicio o si está vacía
-      if (!nuevos[index + 1].fecha_inicio) {
-        nuevos[index + 1] = { ...nuevos[index + 1], fecha_inicio: fechaInicioSiguiente }
-      }
+    // Si se actualiza la fecha_fin de un período, recalcular fechas_inicio de todos los siguientes
+    if (campo === 'fecha_fin' && valor) {
+      recalcularFechasInicioSiguientes(nuevos, index)
     }
     
     setPeriodos(nuevos)
+  }
+
+  // Función para sumar días a una fecha sin problemas de zona horaria
+  const sumarDiasAFecha = (fechaString: string, dias: number): string => {
+    // Usar UTC para evitar problemas de zona horaria
+    const [año, mes, dia] = fechaString.split('-').map(Number)
+    const fecha = new Date(año, mes - 1, dia) // mes es 0-indexado
+    fecha.setDate(fecha.getDate() + dias)
+    
+    // Formatear como YYYY-MM-DD
+    const añoResult = fecha.getFullYear()
+    const mesResult = String(fecha.getMonth() + 1).padStart(2, '0')
+    const diaResult = String(fecha.getDate()).padStart(2, '0')
+    
+    return `${añoResult}-${mesResult}-${diaResult}`
+  }
+
+  // Función para recalcular automáticamente las fechas de inicio de los períodos siguientes
+  const recalcularFechasInicioSiguientes = (periodos: Periodo[], fromIndex: number) => {
+    for (let i = fromIndex + 1; i < periodos.length; i++) {
+      const periodoAnterior = periodos[i - 1]
+      if (periodoAnterior.fecha_fin) {
+        // Usar función que evita problemas de zona horaria
+        const fechaInicioCalculada = sumarDiasAFecha(periodoAnterior.fecha_fin, 1)
+        
+        // SIEMPRE actualizar la fecha de inicio (no es editable para períodos > 1)
+        periodos[i] = { ...periodos[i], fecha_inicio: fechaInicioCalculada }
+      }
+    }
+  }
+
+  // Función para obtener la fecha de inicio del próximo contrato
+  const getFechaInicioContratoActual = () => {
+    if (periodos.length === 0) return ''
+    
+    const ultimoPeriodo = periodos[periodos.length - 1]
+    if (!ultimoPeriodo.fecha_fin) return ''
+    
+    // Usar función que evita problemas de zona horaria
+    return sumarDiasAFecha(ultimoPeriodo.fecha_fin, 1)
   }
 
   const calcularTotales = () => {
@@ -140,7 +171,7 @@ export default function ContractHistorialModal({
 
   const validarFormulario = () => {
     if (periodos.length === 0) {
-      setError('Debe agregar al menos un período')
+      setError('Debe agregar al menos un período al historial')
       return false
     }
 
@@ -148,12 +179,12 @@ export default function ContractHistorialModal({
       const periodo = periodos[i]
       
       if (!periodo.fecha_inicio) {
-        setError(`El período #${i + 1} debe tener fecha de inicio`)
+        setError(`El período #${i + 1} debe tener una fecha de inicio`)
         return false
       }
       
       if (!periodo.fecha_fin) {
-        setError(`El período #${i + 1} debe tener fecha de fin`)
+        setError(`El período #${i + 1} debe tener una fecha de terminación`)
         return false
       }
 
@@ -161,19 +192,36 @@ export default function ContractHistorialModal({
       const fin = new Date(periodo.fecha_fin)
       
       if (inicio >= fin) {
-        setError(`En el período #${i + 1}, la fecha de inicio debe ser anterior a la fecha de fin`)
+        setError(`En el período #${i + 1}, la fecha de terminación debe ser posterior a la fecha de inicio`)
         return false
       }
 
-      // Validar que no se traslapen períodos
+      // Validar duración mínima (al menos 1 día)
+      const dias = Math.ceil((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)) + 1
+      if (dias < 1) {
+        setError(`El período #${i + 1} debe tener al menos 1 día de duración`)
+        return false
+      }
+
+      // Validar continuidad entre períodos (no debe haber huecos ni traslapes)
       if (i > 0) {
         const periodoAnterior = periodos[i - 1]
         const finAnterior = new Date(periodoAnterior.fecha_fin)
+        const inicioCalculado = new Date(finAnterior)
+        inicioCalculado.setDate(inicioCalculado.getDate() + 1)
         
-        if (inicio <= finAnterior) {
-          setError(`El período #${i + 1} no puede iniciar antes del fin del período anterior`)
+        if (inicio.getTime() !== inicioCalculado.getTime()) {
+          setError(`El período #${i + 1} debe iniciar exactamente al día siguiente del período anterior (${inicioCalculado.toISOString().split('T')[0]})`)
           return false
         }
+      }
+
+      // Validar que no sea un período futuro
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0)
+      if (fin > hoy) {
+        setError(`El período #${i + 1} parece ser futuro. Solo agregue períodos que ya terminaron completamente`)
+        return false
       }
     }
 
@@ -269,6 +317,18 @@ export default function ContractHistorialModal({
               </div>
             </div>
 
+            {/* Información del próximo contrato */}
+            {getFechaInicioContratoActual() && (
+              <div className="mt-3 bg-green-100 border border-green-300 rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-green-800 font-medium text-sm">
+                    📅 Fecha de inicio del contrato actual: <strong>{getFechaInicioContratoActual()}</strong>
+                  </span>
+                  <span className="text-xs text-green-600">(Auto-calculada)</span>
+                </div>
+              </div>
+            )}
+
             {/* Alerta legal */}
             {totales.añosTotales >= 4 && (
               <div className="mt-3 bg-red-100 border border-red-300 rounded-lg p-3 flex items-center space-x-2">
@@ -310,13 +370,26 @@ export default function ContractHistorialModal({
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Fecha de Inicio *
+                      {index > 0 && (
+                        <span className="ml-1 text-xs text-blue-600">(Auto-calculada)</span>
+                      )}
                     </label>
                     <input
                       type="date"
                       value={periodo.fecha_inicio}
                       onChange={(e) => actualizarPeriodo(index, 'fecha_inicio', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent text-sm"
+                      disabled={index > 0} // Solo el primer período es editable
+                      className={`w-full px-3 py-2 border rounded-lg text-sm transition-all ${
+                        index > 0 
+                          ? 'bg-blue-50 border-blue-200 text-blue-800 cursor-not-allowed' 
+                          : 'border-gray-300 focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent'
+                      }`}
                     />
+                    {index > 0 && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        📅 Calculada automáticamente como día siguiente al período anterior
+                      </p>
+                    )}
                   </div>
 
                   {/* Fecha Fin */}

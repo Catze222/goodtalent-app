@@ -427,6 +427,21 @@ export default function ContractModal({
     return parseFloat(value.replace(/\./g, '')) || 0
   }
 
+  // Función para sumar días a una fecha sin problemas de zona horaria
+  const sumarDiasAFecha = (fechaString: string, dias: number): string => {
+    // Usar UTC para evitar problemas de zona horaria
+    const [año, mes, dia] = fechaString.split('-').map(Number)
+    const fecha = new Date(año, mes - 1, dia) // mes es 0-indexado
+    fecha.setDate(fecha.getDate() + dias)
+    
+    // Formatear como YYYY-MM-DD
+    const añoResult = fecha.getFullYear()
+    const mesResult = String(fecha.getMonth() + 1).padStart(2, '0')
+    const diaResult = String(fecha.getDate()).padStart(2, '0')
+    
+    return `${añoResult}-${mesResult}-${diaResult}`
+  }
+
   // Tabs configuration
   const tabs = [
     { id: 0, name: 'Información Personal', icon: User, color: 'text-blue-600' },
@@ -922,6 +937,19 @@ export default function ContractModal({
         setFormData(prev => ({ ...prev, fecha_fin: '' }))
       }
     }
+
+    // Lógica especial para empresa_interna
+    if (field === 'empresa_interna') {
+      if (value === 'temporal') {
+        // Si es Temporal y el tipo de contrato no es obra_o_labor, resetearlo
+        setFormData(prev => ({
+          ...prev,
+          empresa_interna: value,
+          tipo_contrato: prev.tipo_contrato !== 'obra_o_labor' ? '' : prev.tipo_contrato
+        }))
+        return // Salir temprano para evitar el setFormData de arriba
+      }
+    }
   }
 
   // Navegación libre entre pestañas
@@ -941,6 +969,34 @@ export default function ContractModal({
 
       console.log('🔄 Guardando historial de períodos:', periodosHistorial.length, 'períodos')
 
+      // 🔧 CORRECCIÓN: En modo edición, usar función para limpiar períodos
+      if (mode === 'edit') {
+        console.log('🧹 Limpiando períodos existentes para evitar duplicados...')
+        
+        // Usar función RPC que tiene los permisos adecuados
+        const { error: cleanError } = await supabase.rpc('clean_contract_periods', {
+          contract_uuid: contractId
+        })
+
+        if (cleanError) {
+          console.error('❌ Error limpiando períodos existentes:', cleanError)
+          // Si la función no existe, intentamos con update (marcar como inactivos)
+          console.log('🔄 Intentando método alternativo...')
+          
+          const { error: updateError } = await supabase
+            .from('historial_contratos_fijos')
+            .update({ es_periodo_actual: false })
+            .eq('contract_id', contractId)
+
+          if (updateError) {
+            console.error('❌ Error con método alternativo:', updateError)
+            throw new Error('No se pudieron actualizar los períodos anteriores')
+          }
+        }
+        
+        console.log('✅ Períodos anteriores procesados correctamente')
+      }
+
       // 1. Crear períodos de historial (PASADOS/TERMINADOS)
       for (let i = 0; i < periodosHistorial.length; i++) {
         const periodo = periodosHistorial[i]
@@ -957,7 +1013,9 @@ export default function ContractModal({
 
         if (error) {
           console.error(`❌ Error guardando período #${i + 1}:`, error)
-          throw error
+          // Convertir errores técnicos a mensajes humanos
+          const errorHumano = convertirErrorTecnicoAHumano(error)
+          throw new Error(errorHumano)
         }
         
         console.log(`✅ Período #${i + 1} guardado correctamente:`, data)
@@ -978,7 +1036,8 @@ export default function ContractModal({
 
         if (error) {
           console.error('❌ Error guardando período actual:', error)
-          throw error
+          const errorHumano = convertirErrorTecnicoAHumano(error)
+          throw new Error(errorHumano)
         }
         
         console.log('✅ Período actual guardado correctamente:', data)
@@ -989,6 +1048,40 @@ export default function ContractModal({
       console.error('💥 Error guardando historial de períodos:', error)
       throw error
     }
+  }
+
+  // Función para convertir errores técnicos de base de datos a mensajes humanos
+  const convertirErrorTecnicoAHumano = (error: any): string => {
+    const errorMessage = error.message || error.toString()
+
+    // Errores comunes de constraints
+    if (errorMessage.includes('check_fechas_validas')) {
+      return 'Las fechas del período no son válidas. La fecha de inicio debe ser anterior a la fecha de fin.'
+    }
+    
+    if (errorMessage.includes('unique_numero_periodo_por_contrato')) {
+      return 'Ya existe un período con ese número para este contrato.'
+    }
+    
+    if (errorMessage.includes('unique_periodo_actual_por_contrato')) {
+      return 'Ya existe un período actual para este contrato.'
+    }
+    
+    if (errorMessage.includes('check_numero_periodo_positivo')) {
+      return 'El número de período debe ser mayor a cero.'
+    }
+    
+    if (errorMessage.includes('check_tipo_periodo_valido')) {
+      return 'El tipo de período no es válido. Debe ser: inicial, prórroga automática o prórroga acordada.'
+    }
+
+    // Errores de foreign key
+    if (errorMessage.includes('foreign key')) {
+      return 'Error de referencia en los datos. Verifique que el contrato exista.'
+    }
+
+    // Error genérico más humano
+    return 'No se pudo guardar el historial de períodos. Verifique que las fechas sean correctas y no se superpongan.'
   }
 
   const nextTab = () => {
@@ -1175,14 +1268,28 @@ export default function ContractModal({
     } catch (error: any) {
       console.error('Error saving contract:', error)
       
+      // Convertir errores técnicos a mensajes humanos
+      const errorMessage = error.message || error.toString()
+      
       if (error.code === '23505') {
-        if (error.message.includes('numero_contrato_helisa')) {
-          setErrors({ numero_contrato_helisa: 'Este número de contrato ya existe' })
-        } else if (error.message.includes('numero_identificacion')) {
-          setErrors({ numero_identificacion: 'Esta identificación ya está registrada' })
+        if (errorMessage.includes('numero_contrato_helisa')) {
+          setErrors({ numero_contrato_helisa: 'Este número de contrato ya existe en el sistema' })
+        } else if (errorMessage.includes('numero_identificacion')) {
+          setErrors({ numero_identificacion: 'Ya existe un contrato con esta identificación' })
+        } else {
+          setErrors({ general: 'Ya existe un registro con esta información' })
         }
+      } else if (errorMessage.includes('unique constraint') || errorMessage.includes('duplicate key')) {
+        setErrors({ general: 'Ya existe un registro con esta información' })
+      } else if (errorMessage.includes('foreign key')) {
+        setErrors({ general: 'Error en los datos relacionados. Verifique que la empresa seleccionada sea válida.' })
+      } else if (errorMessage.includes('check constraint')) {
+        setErrors({ general: 'Algunos datos no cumplen con las validaciones requeridas' })
+      } else if (errorMessage.includes('not null')) {
+        setErrors({ general: 'Faltan campos obligatorios por completar' })
       } else {
-        setErrors({ general: error.message || 'Error al guardar el contrato' })
+        // Mantener el mensaje original si no podemos convertirlo
+        setErrors({ general: errorMessage || 'Error al guardar el contrato' })
       }
     } finally {
       setLoading(false)
@@ -1530,11 +1637,19 @@ export default function ContractModal({
                       {...getInputProps('tipo_contrato')}
                     >
                       <option value="">Seleccionar tipo de contrato...</option>
-                      <option value="indefinido">Indefinido</option>
-                      <option value="fijo">Fijo</option>
-                      <option value="obra_o_labor">Obra o Labor</option>
-                      <option value="sena_universitario">SENA/Universitario</option>
-                      <option value="convenio_institucional">Convenio Institucional</option>
+                      {formData.empresa_interna === 'temporal' ? (
+                        // Solo Obra o Labor para empresa Temporal
+                        <option value="obra_o_labor">Obra o Labor</option>
+                      ) : (
+                        // Todas las opciones para otras empresas
+                        <>
+                          <option value="indefinido">Indefinido</option>
+                          <option value="fijo">Fijo</option>
+                          <option value="obra_o_labor">Obra o Labor</option>
+                          <option value="sena_universitario">SENA/Universitario</option>
+                          <option value="convenio_institucional">Convenio Institucional</option>
+                        </>
+                      )}
                     </select>
                     {errors.tipo_contrato && (
                       <p className="text-red-600 text-xs mt-1">{errors.tipo_contrato}</p>
@@ -1631,21 +1746,26 @@ export default function ContractModal({
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Fecha de Ingreso
-                      {periodosHistorial.length > 0 && formData.fecha_ingreso && (
-                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                          ✨ Auto-completada
+                      {periodosHistorial.length > 0 && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          🔒 Auto-calculada
                         </span>
                       )}
                     </label>
                     <input
                       type="date"
                       value={formData.fecha_ingreso || ''}
-                      onChange={(e) => !isReadOnly && handleInputChange('fecha_ingreso', e.target.value)}
-                      {...getInputProps('fecha_ingreso')}
+                      onChange={(e) => !isReadOnly && !periodosHistorial.length && handleInputChange('fecha_ingreso', e.target.value)}
+                      disabled={isReadOnly || periodosHistorial.length > 0} // Bloquear si hay historial
+                      className={`w-full px-4 py-3 border rounded-xl transition-all ${
+                        isReadOnly || periodosHistorial.length > 0
+                          ? 'bg-blue-50 text-blue-800 cursor-not-allowed border-blue-300 select-none pointer-events-none' 
+                          : `focus:ring-2 focus:ring-[#87E0E0] focus:border-transparent border-gray-300`
+                      }`}
                     />
-                    {periodosHistorial.length > 0 && formData.fecha_ingreso && (
-                      <p className="text-xs text-green-600 mt-1">
-                        📅 Calculada automáticamente: día siguiente al último período del historial
+                    {periodosHistorial.length > 0 && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        🔒 Calculada automáticamente del historial: día siguiente al último período terminado
                       </p>
                     )}
                   </div>
@@ -1686,8 +1806,8 @@ export default function ContractModal({
                       {...getInputProps('tipo_salario')}
                     >
                       <option value="">Seleccionar tipo de salario...</option>
-                      <option value="indefinido">Indefinido</option>
                       <option value="ordinario">Ordinario</option>
+                      <option value="integral">Integral</option>
                       <option value="tiempo_parcial">Tiempo parcial</option>
                     </select>
                     {errors.tipo_salario && (
@@ -2101,9 +2221,8 @@ export default function ContractModal({
             })
             
             if (ultimoPeriodo.fecha_fin) {
-              const fechaFinUltimo = new Date(ultimoPeriodo.fecha_fin)
-              fechaFinUltimo.setDate(fechaFinUltimo.getDate() + 1)
-              const fechaInicioSugerida = fechaFinUltimo.toISOString().split('T')[0]
+              // Usar función que evita problemas de zona horaria
+              const fechaInicioSugerida = sumarDiasAFecha(ultimoPeriodo.fecha_fin, 1)
               
               console.log('🗓️ Auto-completando fecha de inicio:', fechaInicioSugerida)
               

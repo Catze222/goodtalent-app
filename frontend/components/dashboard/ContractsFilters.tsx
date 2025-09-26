@@ -6,14 +6,11 @@ import { Search, Filter, X, Users, Calendar, Building2, CheckCircle, Clock, Aler
 export type FilterStatus = 'all' | 'completed' | 'in_progress' | 'pending'
 export type FilterEmpresa = 'all' | 'good' | 'cps'
 export type FilterAprobacion = 'all' | 'borrador' | 'aprobado'
-export type FilterVigencia = 'all' | 'activo' | 'terminado'
+export type FilterVigencia = 'all' | 'activo' | 'por_vencer' | 'critico' | 'terminado'
 export type FilterOnboarding = 
   | 'all' 
-  | 'completos'
-  | 'sin_examenes' 
   | 'sin_arl' 
   | 'sin_eps' 
-  | 'sin_contrato'
   | 'sin_programacion_cita'
   | 'sin_solicitud_arl'
   | 'sin_envio_contrato'
@@ -51,6 +48,8 @@ interface ContractsFiltersProps {
     borrador: number
     aprobado: number
     activo: number
+    porVencer: number
+    critico: number
     terminado: number
     sinExamenes: number
     sinArl: number
@@ -196,7 +195,7 @@ export default function ContractsFilters({
               ? 'bg-blue-500 text-white' 
               : 'bg-blue-50 border border-blue-200 hover:border-blue-300'
           }`}
-          onClick={() => setFilterVigencia('activo')}
+          onClick={() => setFilterVigencia(filterVigencia === 'activo' ? 'all' : 'activo')}
         >
           <div className="flex items-center space-x-2">
             <div className={`w-3 h-3 rounded-full ${filterVigencia === 'activo' ? 'bg-white' : 'bg-blue-500'}`} />
@@ -209,6 +208,26 @@ export default function ContractsFilters({
           </p>
         </div>
 
+        {/* Por Vencer */}
+        <div 
+          className={`p-3 rounded-xl cursor-pointer transition-all ${
+            filterVigencia === 'por_vencer' 
+              ? 'bg-amber-500 text-white' 
+              : 'bg-amber-50 border border-amber-200 hover:border-amber-300'
+          }`}
+          onClick={() => setFilterVigencia(filterVigencia === 'por_vencer' ? 'all' : 'por_vencer')}
+        >
+          <div className="flex items-center space-x-2">
+            <AlertCircle className={`h-4 w-4 ${filterVigencia === 'por_vencer' ? 'text-white' : 'text-amber-600'}`} />
+            <span className={`text-sm font-medium ${filterVigencia === 'por_vencer' ? 'text-white' : 'text-amber-800'}`}>
+              Por Vencer
+            </span>
+          </div>
+          <p className={`text-2xl font-bold mt-1 ${filterVigencia === 'por_vencer' ? 'text-white' : 'text-amber-800'}`}>
+            {stats.porVencer}
+          </p>
+        </div>
+
         {/* Terminado */}
         <div 
           className={`p-3 rounded-xl cursor-pointer transition-all ${
@@ -216,7 +235,7 @@ export default function ContractsFilters({
               ? 'bg-gray-500 text-white' 
               : 'bg-gray-50 border border-gray-200 hover:border-gray-300'
           }`}
-          onClick={() => setFilterVigencia('terminado')}
+          onClick={() => setFilterVigencia(filterVigencia === 'terminado' ? 'all' : 'terminado')}
         >
           <div className="flex items-center space-x-2">
             <div className={`w-3 h-3 rounded-full ${filterVigencia === 'terminado' ? 'bg-white' : 'bg-gray-500'}`} />
@@ -229,63 +248,23 @@ export default function ContractsFilters({
           </p>
         </div>
 
-        {/* Completados */}
+        {/* Crítico */}
         <div 
           className={`p-3 rounded-xl cursor-pointer transition-all ${
-            filterOnboarding === 'completos' 
-              ? 'bg-teal-500 text-white' 
-              : 'bg-teal-50 border border-teal-200 hover:border-teal-300'
+            filterVigencia === 'critico' 
+              ? 'bg-red-700 text-white' 
+              : 'bg-red-50 border border-red-300 hover:border-red-400'
           }`}
-          onClick={() => setFilterOnboarding('completos')}
+          onClick={() => setFilterVigencia(filterVigencia === 'critico' ? 'all' : 'critico')}
         >
           <div className="flex items-center space-x-2">
-            <CheckCircle className={`h-4 w-4 ${filterOnboarding === 'completos' ? 'text-white' : 'text-teal-600'}`} />
-            <span className={`text-sm font-medium ${filterOnboarding === 'completos' ? 'text-white' : 'text-teal-800'}`}>
-              Onb. Completo
+            <AlertCircle className={`h-4 w-4 ${filterVigencia === 'critico' ? 'text-white' : 'text-red-700'}`} />
+            <span className={`text-sm font-medium ${filterVigencia === 'critico' ? 'text-white' : 'text-red-900'}`}>
+              🔥 Crítico
             </span>
           </div>
-          <p className={`text-2xl font-bold mt-1 ${filterOnboarding === 'completos' ? 'text-white' : 'text-teal-800'}`}>
-            {stats.completed}
-          </p>
-        </div>
-
-        {/* Sin Exámenes */}
-        <div 
-          className={`p-3 rounded-xl cursor-pointer transition-all ${
-            filterOnboarding === 'sin_examenes' 
-              ? 'bg-red-500 text-white' 
-              : 'bg-red-50 border border-red-200 hover:border-red-300'
-          }`}
-          onClick={() => setFilterOnboarding('sin_examenes')}
-        >
-          <div className="flex items-center space-x-2">
-            <AlertCircle className={`h-4 w-4 ${filterOnboarding === 'sin_examenes' ? 'text-white' : 'text-red-600'}`} />
-            <span className={`text-sm font-medium ${filterOnboarding === 'sin_examenes' ? 'text-white' : 'text-red-800'}`}>
-              Sin Exámenes
-            </span>
-          </div>
-          <p className={`text-2xl font-bold mt-1 ${filterOnboarding === 'sin_examenes' ? 'text-white' : 'text-red-800'}`}>
-            {stats.sinExamenes}
-          </p>
-        </div>
-
-        {/* Sin Contrato */}
-        <div 
-          className={`p-3 rounded-xl cursor-pointer transition-all ${
-            filterOnboarding === 'sin_contrato' 
-              ? 'bg-orange-500 text-white' 
-              : 'bg-orange-50 border border-orange-200 hover:border-orange-300'
-          }`}
-          onClick={() => setFilterOnboarding('sin_contrato')}
-        >
-          <div className="flex items-center space-x-2">
-            <AlertCircle className={`h-4 w-4 ${filterOnboarding === 'sin_contrato' ? 'text-white' : 'text-orange-600'}`} />
-            <span className={`text-sm font-medium ${filterOnboarding === 'sin_contrato' ? 'text-white' : 'text-orange-800'}`}>
-              Sin Contrato
-            </span>
-          </div>
-          <p className={`text-2xl font-bold mt-1 ${filterOnboarding === 'sin_contrato' ? 'text-white' : 'text-orange-800'}`}>
-            {stats.sinContrato}
+          <p className={`text-2xl font-bold mt-1 ${filterVigencia === 'critico' ? 'text-white' : 'text-red-900'}`}>
+            {stats.critico}
           </p>
         </div>
       </div>
