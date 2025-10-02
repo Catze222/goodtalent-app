@@ -7,7 +7,7 @@
 
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { User } from '@supabase/supabase-js'
 import { supabase } from './supabaseClient'
 import { sessionDebugger } from './sessionDebugger'
@@ -64,39 +64,69 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
   // Session refresh automático cada 30 segundos para evitar problemas de inactividad
   const SESSION_CHECK_INTERVAL = 30 * 1000 // 30 segundos
   
+  // Timeout para llamadas RPC (prevenir cuelgue infinito)
+  const RPC_TIMEOUT = 15 * 1000 // 15 segundos
+  
   // Tracking de inactividad del usuario
   const [lastActivityTime, setLastActivityTime] = useState<number>(Date.now())
+  
+  // NUEVO: Lock para prevenir llamadas duplicadas simultáneas
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
+  const loadingLockRef = useRef(false)
 
   const fetchUserPermissions = useCallback(async (currentUser: User) => {
-    // Verificar cache en localStorage
-    const cacheKey = `permissions_${currentUser.id}`
-    const cachedData = localStorage.getItem(cacheKey)
-    
-    if (cachedData) {
-      try {
-        const parsed = JSON.parse(cachedData)
-        const cacheAge = Date.now() - parsed.timestamp
-        
-        if (cacheAge < CACHE_DURATION) {
-          sessionDebugger.cacheStatus(cacheKey, 'hit')
-          setPermissions(parsed.permissions)
-          setLastFetch(new Date(parsed.timestamp))
-          return
-        } else {
-          sessionDebugger.cacheStatus(cacheKey, 'stale')
-          localStorage.removeItem(cacheKey)
-        }
-      } catch (e) {
-        sessionDebugger.warning('Cache corrupto, limpiando', { cacheKey, error: e })
-        localStorage.removeItem(cacheKey)
-      }
-    } else {
-      sessionDebugger.cacheStatus(cacheKey, 'miss')
+    // NUEVO: Verificar lock para prevenir llamadas duplicadas
+    if (loadingLockRef.current) {
+      sessionDebugger.warning('⚠️ Carga de permisos ya en progreso, saltando llamada duplicada', {
+        userId: currentUser.id
+      })
+      return
     }
 
+    // Activar lock
+    loadingLockRef.current = true
+    setIsLoadingPermissions(true)
+    sessionDebugger.debug('🔒 Lock de carga activado', { userId: currentUser.id })
+
     try {
-      sessionDebugger.info('Cargando permisos desde Supabase', { userId: currentUser.id })
-      const { data, error } = await supabase.rpc('my_permissions')
+      // Verificar cache en localStorage
+      const cacheKey = `permissions_${currentUser.id}`
+      const cachedData = localStorage.getItem(cacheKey)
+      
+      if (cachedData) {
+        try {
+          const parsed = JSON.parse(cachedData)
+          const cacheAge = Date.now() - parsed.timestamp
+          
+          if (cacheAge < CACHE_DURATION) {
+            sessionDebugger.cacheStatus(cacheKey, 'hit')
+            setPermissions(parsed.permissions)
+            setLastFetch(new Date(parsed.timestamp))
+            return
+          } else {
+            sessionDebugger.cacheStatus(cacheKey, 'stale')
+            localStorage.removeItem(cacheKey)
+          }
+        } catch (e) {
+          sessionDebugger.warning('Cache corrupto, limpiando', { cacheKey, error: e })
+          localStorage.removeItem(cacheKey)
+        }
+      } else {
+        sessionDebugger.cacheStatus(cacheKey, 'miss')
+      }
+
+      // NUEVO: Llamada con timeout para prevenir cuelgue infinito
+      sessionDebugger.info('Cargando permisos desde Supabase (timeout: 15s)', { userId: currentUser.id })
+      
+      const permissionsPromise = supabase.rpc('my_permissions')
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout: my_permissions tardó más de 15 segundos')), RPC_TIMEOUT)
+      )
+      
+      const { data, error } = await Promise.race([
+        permissionsPromise,
+        timeoutPromise
+      ]) as any
       
       if (error) {
         sessionDebugger.error('Error cargando permisos', error)
@@ -123,6 +153,20 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
     } catch (error) {
       sessionDebugger.error('Excepción cargando permisos', error)
       setPermissions([])
+      
+      // Si es timeout, dar más información
+      if (error instanceof Error && error.message.includes('Timeout')) {
+        sessionDebugger.problemDetected('Timeout en carga de permisos', {
+          duracion: '> 15 segundos',
+          posibleCausa: 'RPC my_permissions no responde',
+          solucion: 'Recargar página o verificar conexión'
+        })
+      }
+    } finally {
+      // IMPORTANTE: Siempre desactivar lock
+      loadingLockRef.current = false
+      setIsLoadingPermissions(false)
+      sessionDebugger.debug('🔓 Lock de carga desactivado')
     }
   }, []) // SIN dependencias para evitar loops
 
@@ -199,7 +243,13 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
           sessionDebugger.success('Usuario autenticado', { email: session.user.email })
           setUser(session.user)
           setLastActivityTime(Date.now())
-          await fetchUserPermissions(session.user)
+          
+          // NUEVO: Solo cargar si no está ya cargando (prevenir duplicados)
+          if (!loadingLockRef.current) {
+            await fetchUserPermissions(session.user)
+          } else {
+            sessionDebugger.debug('Carga ya en progreso desde initializeAuth, saltando')
+          }
         } else if (event === 'SIGNED_OUT') {
           sessionDebugger.warning('Sesión cerrada')
           setUser(null)
