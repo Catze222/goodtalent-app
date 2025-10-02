@@ -58,8 +58,8 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
   const [lastFetch, setLastFetch] = useState<Date | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
 
-  // Cache de permisos - solo recargar si han pasado más de 5 minutos
-  const CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
+  // Cache de permisos - cache más agresivo para evitar esperas de 15s en cold start
+  const CACHE_DURATION = 60 * 60 * 1000 // 1 hora (optimizado para UX)
   
   // Session refresh automático cada 30 segundos para evitar problemas de inactividad
   const SESSION_CHECK_INTERVAL = 30 * 1000 // 30 segundos
@@ -177,7 +177,6 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
     }
     
     try {
-      setLoading(true)
       sessionDebugger.info('Inicializando autenticación...')
       
       // Obtener sesión actual
@@ -185,6 +184,7 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
       
       if (error) {
         sessionDebugger.error('Error obteniendo sesión', error)
+        setLoading(false)
         setUser(null)
         setPermissions([])
         return
@@ -197,12 +197,49 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
         )
         setUser(session.user)
         setLastActivityTime(Date.now())
-        // Llamar función directamente para evitar dependencias
+        
+        // MEJORA: Verificar si hay cache antes de bloquear
+        const cacheKey = `permissions_${session.user.id}`
+        const cachedData = localStorage.getItem(cacheKey)
+        
+        if (cachedData) {
+          try {
+            const parsed = JSON.parse(cachedData)
+            const cacheAge = Date.now() - parsed.timestamp
+            
+            // Si hay cache (aunque sea viejo), usarlo inmediatamente
+            if (parsed.permissions && parsed.permissions.length > 0) {
+              sessionDebugger.info('✨ Usando cache para entrada rápida', {
+                age: `${Math.floor(cacheAge / 1000)}s`,
+                count: parsed.permissions.length
+              })
+              setPermissions(parsed.permissions)
+              setLastFetch(new Date(parsed.timestamp))
+              setLoading(false) // ← IMPORTANTE: Permitir entrada inmediata
+              
+              // Si el cache es viejo (> 5 min), recargar en background
+              if (cacheAge > 5 * 60 * 1000) {
+                sessionDebugger.info('🔄 Actualizando permisos en background (cache > 5min)')
+                fetchUserPermissions(session.user) // Sin await - en background
+              }
+              
+              setIsInitialized(true)
+              return
+            }
+          } catch (e) {
+            sessionDebugger.warning('Cache corrupto en init', e)
+          }
+        }
+        
+        // Si NO hay cache, cargar normalmente (bloquear)
+        setLoading(true)
         await fetchUserPermissions(session.user)
+        setLoading(false)
       } else {
         sessionDebugger.warning('No hay sesión activa')
         setUser(null)
         setPermissions([])
+        setLoading(false)
       }
       
       setIsInitialized(true)
@@ -210,7 +247,6 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
       sessionDebugger.error('Error inicializando auth', error)
       setUser(null)
       setPermissions([])
-    } finally {
       setLoading(false)
     }
   }, [isInitialized]) // Depende de isInitialized
