@@ -5,6 +5,7 @@ import { X, Clock, Save, AlertCircle, ArrowLeft, Calendar, Pause, RefreshCw } fr
 import { supabase } from '@/lib/supabaseClient'
 import { usePermissions } from '@/lib/usePermissions'
 import ContractHistoryTimeline from './ContractHistoryTimeline'
+import { getDateLimits, validateDateInput } from '@/utils/dateValidation'
 
 /**
  * Modal para gestionar novedades de tiempo laboral

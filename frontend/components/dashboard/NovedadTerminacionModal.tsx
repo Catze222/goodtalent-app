@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, AlertTriangle, Save, AlertCircle, ArrowLeft, Calendar, FileText, XCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { usePermissions } from '@/lib/usePermissions'
+import { getDateLimits, validateDateInput } from '@/utils/dateValidation'
 
 /**
  * Modal para gestionar terminaciones de contratos
@@ -372,8 +373,13 @@ export default function NovedadTerminacionModal({
                   </label>
                   <input
                     type="date"
+                    {...getDateLimits('work')}
                     value={fecha}
-                    onChange={(e) => setFecha(e.target.value)}
+                    onChange={(e) => {
+                      if (validateDateInput(e.target.value, 'work')) {
+                        setFecha(e.target.value)
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                     required
                   />

@@ -9,6 +9,7 @@ import ContractModalOnboarding from './ContractModalOnboarding'
 import CompanySelector from '../ui/CompanySelector'
 import CitySelector from '../ui/CitySelector'
 import ContractHistorialModal from './ContractHistorialModal'
+import { getDateLimits, validateDateInput } from '../../utils/dateValidation'
 
 
 
@@ -1429,8 +1430,13 @@ export default function ContractModal({
                     </label>
                     <input
                       type="date"
+                      {...getDateLimits('document')}
                       value={formData.fecha_expedicion_documento || ''}
-                      onChange={(e) => !isReadOnly && handleInputChange('fecha_expedicion_documento', e.target.value)}
+                      onChange={(e) => {
+                        if (!isReadOnly && validateDateInput(e.target.value, 'document')) {
+                          handleInputChange('fecha_expedicion_documento', e.target.value)
+                        }
+                      }}
                       {...getInputProps('fecha_expedicion_documento')}
                     />
                   </div>
@@ -1505,8 +1511,13 @@ export default function ContractModal({
                     </label>
                     <input
                       type="date"
+                      {...getDateLimits('birth')}
                       value={formData.fecha_nacimiento}
-                      onChange={(e) => !isReadOnly && handleInputChange('fecha_nacimiento', e.target.value)}
+                      onChange={(e) => {
+                        if (!isReadOnly && validateDateInput(e.target.value, 'birth')) {
+                          handleInputChange('fecha_nacimiento', e.target.value)
+                        }
+                      }}
                       {...getInputProps('fecha_nacimiento', !!errors.fecha_nacimiento)}
                     />
                     {errors.fecha_nacimiento && (
@@ -1754,8 +1765,13 @@ export default function ContractModal({
                     </label>
                     <input
                       type="date"
+                      {...getDateLimits('work')}
                       value={formData.fecha_ingreso || ''}
-                      onChange={(e) => !isReadOnly && !periodosHistorial.length && handleInputChange('fecha_ingreso', e.target.value)}
+                      onChange={(e) => {
+                        if (!isReadOnly && !periodosHistorial.length && validateDateInput(e.target.value, 'work')) {
+                          handleInputChange('fecha_ingreso', e.target.value)
+                        }
+                      }}
                       disabled={isReadOnly || periodosHistorial.length > 0} // Bloquear si hay historial
                       className={`w-full px-4 py-3 border rounded-xl transition-all ${
                         isReadOnly || periodosHistorial.length > 0
@@ -1780,8 +1796,13 @@ export default function ContractModal({
                     </label>
                     <input
                       type="date"
+                      {...getDateLimits('work')}
                       value={formData.tipo_contrato === 'indefinido' ? '' : formData.fecha_fin || ''}
-                      onChange={(e) => !isReadOnly && handleInputChange('fecha_fin', e.target.value)}
+                      onChange={(e) => {
+                        if (!isReadOnly && validateDateInput(e.target.value, 'work')) {
+                          handleInputChange('fecha_fin', e.target.value)
+                        }
+                      }}
                       {...getInputProps('fecha_fin', !!errors.fecha_fin)}
                       disabled={formData.tipo_contrato === 'indefinido' || isReadOnly}
                       className={`${getInputProps('fecha_fin', !!errors.fecha_fin).className} ${
@@ -2055,8 +2076,13 @@ export default function ContractModal({
                       </label>
                       <input
                         type="date"
+                        {...getDateLimits('past')}
                         value={formData.fecha_solicitud || ''}
-                        onChange={(e) => !isReadOnly && handleInputChange('fecha_solicitud', e.target.value)}
+                        onChange={(e) => {
+                          if (!isReadOnly && validateDateInput(e.target.value, 'past')) {
+                            handleInputChange('fecha_solicitud', e.target.value)
+                          }
+                        }}
                         {...getInputProps('fecha_solicitud')}
                       />
                     </div>
@@ -2067,8 +2093,13 @@ export default function ContractModal({
                       </label>
                       <input
                         type="date"
+                        {...getDateLimits('past')}
                         value={formData.fecha_radicado || ''}
-                        onChange={(e) => !isReadOnly && handleInputChange('fecha_radicado', e.target.value)}
+                        onChange={(e) => {
+                          if (!isReadOnly && validateDateInput(e.target.value, 'past')) {
+                            handleInputChange('fecha_radicado', e.target.value)
+                          }
+                        }}
                         {...getInputProps('fecha_radicado')}
                       />
                     </div>
