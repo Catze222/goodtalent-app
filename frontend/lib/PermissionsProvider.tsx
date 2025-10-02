@@ -1,6 +1,8 @@
 /**
  * Context Provider global para gestión de permisos
  * Carga los permisos UNA SOLA VEZ por sesión y los mantiene en memoria
+ * 
+ * MEJORADO con debugging y manejo robusto de sesiones
  */
 
 'use client'
@@ -8,6 +10,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { User } from '@supabase/supabase-js'
 import { supabase } from './supabaseClient'
+import { sessionDebugger } from './sessionDebugger'
 
 export interface UserPermission {
   table_name: string
@@ -60,6 +63,9 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
   
   // Session refresh automático cada 30 segundos para evitar problemas de inactividad
   const SESSION_CHECK_INTERVAL = 30 * 1000 // 30 segundos
+  
+  // Tracking de inactividad del usuario
+  const [lastActivityTime, setLastActivityTime] = useState<number>(Date.now())
 
   const fetchUserPermissions = useCallback(async (currentUser: User) => {
     // Verificar cache en localStorage
@@ -72,22 +78,28 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
         const cacheAge = Date.now() - parsed.timestamp
         
         if (cacheAge < CACHE_DURATION) {
+          sessionDebugger.cacheStatus(cacheKey, 'hit')
           setPermissions(parsed.permissions)
           setLastFetch(new Date(parsed.timestamp))
           return
         } else {
+          sessionDebugger.cacheStatus(cacheKey, 'stale')
           localStorage.removeItem(cacheKey)
         }
       } catch (e) {
+        sessionDebugger.warning('Cache corrupto, limpiando', { cacheKey, error: e })
         localStorage.removeItem(cacheKey)
       }
+    } else {
+      sessionDebugger.cacheStatus(cacheKey, 'miss')
     }
 
     try {
+      sessionDebugger.info('Cargando permisos desde Supabase', { userId: currentUser.id })
       const { data, error } = await supabase.rpc('my_permissions')
       
       if (error) {
-        console.error('Error fetching permissions:', error)
+        sessionDebugger.error('Error cargando permisos', error)
         setPermissions([])
         return
       }
@@ -100,45 +112,58 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
         timestamp: Date.now()
       }))
       
+      sessionDebugger.success('Permisos cargados exitosamente', { 
+        count: permissionsData.length,
+        cached: true
+      })
+      
       setPermissions(permissionsData)
       setLastFetch(new Date())
       
     } catch (error) {
-      console.error('Exception fetching permissions:', error)
+      sessionDebugger.error('Excepción cargando permisos', error)
       setPermissions([])
     }
   }, []) // SIN dependencias para evitar loops
 
   const initializeAuth = useCallback(async () => {
     if (isInitialized) {
+      sessionDebugger.debug('Auth ya inicializado, saltando')
       return
     }
     
     try {
       setLoading(true)
+      sessionDebugger.info('Inicializando autenticación...')
       
       // Obtener sesión actual
       const { data: { session }, error } = await supabase.auth.getSession()
       
       if (error) {
-        console.error('Error getting session:', error)
+        sessionDebugger.error('Error obteniendo sesión', error)
         setUser(null)
         setPermissions([])
         return
       }
 
       if (session?.user) {
+        sessionDebugger.sessionInitialized(
+          session.user, 
+          session.expires_at || 0
+        )
         setUser(session.user)
+        setLastActivityTime(Date.now())
         // Llamar función directamente para evitar dependencias
         await fetchUserPermissions(session.user)
       } else {
+        sessionDebugger.warning('No hay sesión activa')
         setUser(null)
         setPermissions([])
       }
       
       setIsInitialized(true)
     } catch (error) {
-      console.error('Error initializing auth:', error)
+      sessionDebugger.error('Error inicializando auth', error)
       setUser(null)
       setPermissions([])
     } finally {
@@ -160,14 +185,23 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
         // Debounce para evitar eventos duplicados
         const now = Date.now()
         if (now - lastEventTime < 1000) {
+          sessionDebugger.debug('Evento auth duplicado ignorado', { event })
           return
         }
         lastEventTime = now
         
+        sessionDebugger.info(`Auth State Change: ${event}`, { 
+          hasSession: !!session, 
+          hasUser: !!session?.user 
+        })
+        
         if (event === 'SIGNED_IN' && session?.user && !user) {
+          sessionDebugger.success('Usuario autenticado', { email: session.user.email })
           setUser(session.user)
+          setLastActivityTime(Date.now())
           await fetchUserPermissions(session.user)
         } else if (event === 'SIGNED_OUT') {
+          sessionDebugger.warning('Sesión cerrada')
           setUser(null)
           setPermissions([])
           setLastFetch(null)
@@ -177,8 +211,14 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
           keys.forEach(key => {
             if (key.startsWith('permissions_') || key.startsWith('companies_') || key.startsWith('users_')) {
               localStorage.removeItem(key)
+              sessionDebugger.cacheStatus(key, 'cleared')
             }
           })
+        } else if (event === 'TOKEN_REFRESHED') {
+          sessionDebugger.success('Token refrescado por Supabase', {
+            expiresAt: session?.expires_at
+          })
+          setLastActivityTime(Date.now())
         }
       }
     )
@@ -189,11 +229,14 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
   // Logout handler - limpiar cache
   const handleLogout = useCallback(async () => {
     try {
+      sessionDebugger.info('Iniciando logout...')
+      
       // Limpiar cache de localStorage
       const keys = Object.keys(localStorage)
       keys.forEach(key => {
         if (key.startsWith('permissions_') || key.startsWith('companies_') || key.startsWith('users_')) {
           localStorage.removeItem(key)
+          sessionDebugger.cacheStatus(key, 'cleared')
         }
       })
       
@@ -206,15 +249,17 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
       // Llamar logout de Supabase
       const { error } = await supabase.auth.signOut()
       if (error) {
-        console.error('Error signing out:', error)
+        sessionDebugger.error('Error en signOut', error)
+      } else {
+        sessionDebugger.success('Logout exitoso')
       }
       
     } catch (error) {
-      console.error('Error during logout:', error)
+      sessionDebugger.error('Excepción durante logout', error)
     }
   }, [])
 
-  // Session refresh simplificado - solo refrescar token si es necesario
+  // Session refresh MEJORADO - más proactivo y con mejor diagnóstico
   useEffect(() => {
     if (!user) return
 
@@ -225,19 +270,59 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
         if (session) {
           const now = Date.now() / 1000
           const expiresAt = session.expires_at || 0
-          const timeUntilExpiry = expiresAt - now
+          const timeUntilExpiry = Math.floor(expiresAt - now)
           
-          if (timeUntilExpiry < 300) {
-            await supabase.auth.refreshSession()
+          // Calcular tiempo de inactividad
+          const inactiveTime = Math.floor((Date.now() - lastActivityTime) / 1000)
+          const warnings: string[] = []
+          
+          if (inactiveTime > 300) { // 5 minutos de inactividad
+            warnings.push(`Inactivo por ${inactiveTime}s`)
+            sessionDebugger.userInactive(inactiveTime)
           }
+          
+          // CAMBIO CRÍTICO: Refrescar si quedan menos de 10 minutos (antes era 5)
+          // Esto da más margen en caso de que el navegador esté en sleep
+          if (timeUntilExpiry < 600) {
+            warnings.push('Sesión próxima a expirar')
+            sessionDebugger.sessionRefreshAttempt(`Quedan ${timeUntilExpiry}s para expiración`)
+            
+            const { data, error } = await supabase.auth.refreshSession()
+            
+            if (error) {
+              sessionDebugger.sessionRefreshFailed(error)
+              
+              // Si el refresh falla, verificar si realmente perdimos la sesión
+              const { data: { session: currentSession } } = await supabase.auth.getSession()
+              if (!currentSession) {
+                sessionDebugger.problemDetected('Sesión perdida después de refresh fallido', {
+                  lastError: error,
+                  inactiveTime,
+                  lastActivity: new Date(lastActivityTime).toISOString()
+                })
+              }
+            } else if (data?.session) {
+              sessionDebugger.sessionRefreshSuccess(data.session.expires_at || 0)
+              setLastActivityTime(Date.now()) // Actualizar última actividad
+            }
+          } else {
+            // Solo log periódico si todo está bien
+            sessionDebugger.sessionCheck(true, timeUntilExpiry, warnings.length > 0 ? warnings : undefined)
+          }
+        } else {
+          // No hay sesión - PROBLEMA CRÍTICO
+          sessionDebugger.problemDetected('No hay sesión en check periódico', {
+            lastActivityTime: new Date(lastActivityTime).toISOString(),
+            inactiveDuration: Math.floor((Date.now() - lastActivityTime) / 1000)
+          })
         }
       } catch (error) {
-        console.warn('Session check failed:', error)
+        sessionDebugger.error('Session check falló con excepción', error)
       }
     }, SESSION_CHECK_INTERVAL)
 
     return () => clearInterval(interval)
-  }, [user?.id])
+  }, [user?.id, lastActivityTime])
 
   // Funciones de verificación de permisos
   const hasPermission = useCallback((tableName: string, action: string): boolean => {
